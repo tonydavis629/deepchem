@@ -57,9 +57,9 @@ class FF(nn.Module):
         return self.block(x) + self.linear_shortcut(x)
     
     
-class Infograph(torch.nn.Module):
+class InfoGraph(torch.nn.Module):
     def __init__(self, num_features, dim, use_unsup_loss=False, separate_encoder=False):
-        super(Infograph, self).__init__()
+        super(InfoGraph, self).__init__()
 
         self.embedding_dim = dim
         self.separate_encoder = separate_encoder
