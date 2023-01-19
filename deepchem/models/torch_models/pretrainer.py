@@ -118,7 +118,7 @@ pretrainer.fit(pt_dataset, nb_epoch=100) # will save with pretrained head at eve
 # toy.load_from_pretrained() # does not work on master
 # toy.load_from_pretrained(toy) # does not work on master, no ckpt found (self.model_dir not passed)
 # toy.load_from_pretrained(toy, checkpoint='./testfolder/checkpoint5.pt') # works on master
-# toy.load_from_pretrained(toy2, include_top=False) # works on master
+toy.load_from_pretrained(toy2, include_top=False) # works on master
 
 # toy.load_from_pretrained() # works on pretrainer branch. uses self.model as source_model
 
