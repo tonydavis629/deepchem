@@ -1091,12 +1091,17 @@ class TorchModel(Model):
             if true, copies the last dense layer
         """
         assignment_map: Dict[Any, Any] = {}
-        source_vars = list(source_model.model.parameters())
-        dest_vars = list(self.model.parameters())
-
         if not include_top:
-            source_vars = source_vars[:-2]
-            dest_vars = dest_vars[:-2]
+            # source_model.model = source_model._embedding
+            source_vars = list(source_model.model._embedding.parameters())
+            dest_vars = list(self.model._embeddingparameters())
+        else:
+            source_vars = list(source_model.model.parameters())
+            dest_vars = list(self.model.parameters())
+
+        # if not include_top:
+        #     source_vars = source_vars[:-2]
+        #     dest_vars = dest_vars[:-2]
 
         for source_var, dest_var in zip(source_vars, dest_vars):
             assignment_map[source_var] = dest_var
@@ -1192,6 +1197,12 @@ class TorchModel(Model):
             assert source_var.shape == dest_var.shape
             dest_var.data = torch.as_tensor(value_map[source_var],
                                             device=self.device)
+											
+    def get_head():
+      return NotImplementedError("The subclass of TorchModel must implement get_head()")
+
+    def get_embedding():
+      return NotImplementedError("The subclass of TorchModel must implement get_embedding()")
 
 
 class _StandardLoss(object):
