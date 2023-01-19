@@ -34,7 +34,8 @@ class Pretrainer(TorchModel):
                  torchmodel:TorchModel,
                  **kwargs): 
         self.torchmodel = torchmodel
-        super().__init__(torchmodel.model, torchmodel.loss, model_dir=torchmodel.model_dir,**kwargs)
+        self.pretrain_model_dir = os.path.join(torchmodel.model_dir, "pretrain")
+        super().__init__(torchmodel.model, torchmodel.loss, model_dir=self.pretrain_model_dir,**kwargs)
     def freeze_embedding(self):
         self.torchmodel.model.embedding.weight.requires_grad = False
     def unfreeze_embedding(self):
@@ -62,7 +63,7 @@ class Pretrainer(TorchModel):
         self._swap_head()
         super().fit(dataset, nb_epoch, max_checkpoints_to_keep, checkpoint_interval, deterministic, restore, variables, loss, callbacks, all_losses) #use assignment map to save only embedding layers
         self._swap_head()
-        self.save_checkpoint(model_dir = os.path.join(self.model_dir, 'pretrained'))  # model_dir=os.path.join(self.model_dir, 'completed_pretrained')
+        self.save_checkpoint()  # model_dir = self.pretrain_model_dir
 
 
 class ToyPretrainer(Pretrainer):
@@ -71,6 +72,7 @@ class ToyPretrainer(Pretrainer):
                  **kwargs): 
         torchmodel.loss = self._define_pretrain_loss()
         self.torchmodel = torchmodel
+        # self.model_dir = 
         self.embedding_dim = torchmodel.model._embedding.out_features
         self.old_head = torchmodel.model._head
         self.new_head = self._generate_head()
@@ -84,7 +86,7 @@ class ToyPretrainer(Pretrainer):
     def _define_pretrain_loss(self):
         return L1Loss()
 
-        
+np.random.seed(123)
 n_samples = 10
 input_size = 15
 hidden_layers = 3
@@ -92,11 +94,11 @@ n_tasks = 3
 
 X = np.random.rand(n_samples, input_size)
 y = np.random.randint(2, size=(n_samples, n_tasks)).astype(np.float32)
-ft_dataset = dc.data.NumpyDataset(X, y)
+pt_dataset = dc.data.NumpyDataset(X, y)
 
 X = np.random.rand(n_samples, input_size)
 y = np.random.randint(2, size=(n_samples, n_tasks)).astype(np.float32)
-pt_dataset = dc.data.NumpyDataset(X, y)
+ft_dataset = dc.data.NumpyDataset(X, y)
 
 X = np.random.rand(n_samples, input_size)
 y = np.random.randint(2, size=(n_samples, n_tasks)).astype(np.float32)
@@ -105,42 +107,16 @@ test_dataset = dc.data.NumpyDataset(X)
 
 toy = ToyTorchModel(input_size, hidden_layers, n_tasks)
 toy2 = ToyTorchModel(input_size, hidden_layers, n_tasks, model_dir = './testfolder')
-###
 
-pretrainer = ToyPretrainer(toy2) 
-
-# pretrainer.freeze_embedding()
-pretrainer.fit(pt_dataset, nb_epoch=100) # will save with pretrained head at every interval
-# pretrainer.save_checkpoint(model_dir = os.path.join(pretrainer.model_dir, 'completed_pretrained')) # will save with original head
-
-### load_from_pretrained()
-
-# toy.load_from_pretrained() # does not work on master
-# toy.load_from_pretrained(toy) # does not work on master, no ckpt found (self.model_dir not passed)
-# toy.load_from_pretrained(toy, checkpoint='./testfolder/checkpoint5.pt') # works on master
-toy.load_from_pretrained(toy2, include_top=False) # works on master
-
-# toy.load_from_pretrained() # works on pretrainer branch. uses self.model as source_model
-
-### restore()
-
-# .restore() load from model_dir does not work as expected, need to pass model_dir again
-# toy.restore() # works on master
-# toy.restore(checkpoint='/home/tony/github/bio/deepchem/deepchem/models/torch_models/testfolder/checkpoint5.pt') # works on master
-# toy.restore(model_dir='/home/tony/github/bio/deepchem/deepchem/models/torch_models/testfolder') # works on master
-# toy.restore() # works on pretrainer 
-
-
-#### only load embedding, if defined
-# default behavior, load embedding flag. if not expects assignment mapping
-# load embedding only as option in load_from_pretrained
-# toy.load_from_pretrained(pretrained_model_dir='/home/tony/github/bio/deepchem/deepchem/models/torch_models/testfolder', load_embedding=True) 
-
-
-###
-
-# toy.fit(ft_dataset, nb_epoch=100, checkpoint_interval=10) 
-# toy.save_checkpoint(model_dir='/home/tony/github/bio/deepchem/deepchem/models/torch_models/testfolder/')
-
+### load_from_pretrained() test
+# toy2.fit(ft_dataset, nb_epoch=100, checkpoint_interval=10) 
+# preds = toy2.predict(test_dataset)
+# print('toy2 preds: ', preds)
+# toy.load_from_pretrained(toy2, include_top=False, model_dir = toy2.model_dir)
 # preds = toy.predict(test_dataset)
-# print(preds)
+# print('toy preds: ', preds)
+
+pretrainer = ToyPretrainer(toy2) # model_dir = './testfolder/pretrain'
+pretrainer.fit(pt_dataset, nb_epoch=100) 
+
+toy.load_from_pretrained(toy2, include_top=True, model_dir = pretrainer.pretrain_model_dir) 
