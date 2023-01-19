@@ -34,8 +34,7 @@ class Pretrainer(TorchModel):
                  torchmodel:TorchModel,
                  **kwargs): 
         self.torchmodel = torchmodel
-        self.model_dir = torchmodel.model_dir 
-        super().__init__(torchmodel.model, torchmodel.loss, **kwargs)
+        super().__init__(torchmodel.model, torchmodel.loss, model_dir=torchmodel.model_dir,**kwargs)
     def freeze_embedding(self):
         self.torchmodel.model.embedding.weight.requires_grad = False
     def unfreeze_embedding(self):
@@ -112,6 +111,7 @@ pretrainer = ToyPretrainer(toy2)
 
 # pretrainer.freeze_embedding()
 pretrainer.fit(pt_dataset, nb_epoch=100) # will save with pretrained head at every interval
+# pretrainer.save_checkpoint(model_dir = os.path.join(pretrainer.model_dir, 'completed_pretrained')) # will save with original head
 
 ### load_from_pretrained()
 
