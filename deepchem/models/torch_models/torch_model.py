@@ -1193,6 +1193,7 @@ class TorchModel(Model):
             assert source_var.shape == dest_var.shape
             dest_var.data = torch.as_tensor(value_map[source_var],
                                             device=self.device)
+            
 											
     def get_head():
       return NotImplementedError("The subclass of TorchModel must implement get_head()")

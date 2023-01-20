@@ -35,7 +35,9 @@ class Pretrainer(TorchModel):
                  **kwargs): 
         self.torchmodel = torchmodel
         self.pretrain_model_dir = os.path.join(torchmodel.model_dir, "pretrain")
-        super().__init__(torchmodel.model, torchmodel.loss, model_dir=self.pretrain_model_dir,**kwargs)
+        # super().__init__(torchmodel.model, torchmodel.loss, model_dir=self.pretrain_model_dir,**kwargs) # unique pretrainer model dir 
+        super().__init__(torchmodel.model, torchmodel.loss, model_dir=torchmodel.model_dir,**kwargs) # same model dir as torchmodel
+        # self._pytorch_optimizer.freeze() ?
     def freeze_embedding(self):
         self.torchmodel.model.embedding.weight.requires_grad = False
     def unfreeze_embedding(self):
@@ -63,7 +65,8 @@ class Pretrainer(TorchModel):
         self._swap_head()
         super().fit(dataset, nb_epoch, max_checkpoints_to_keep, checkpoint_interval, deterministic, restore, variables, loss, callbacks, all_losses) #use assignment map to save only embedding layers
         self._swap_head()
-        self.save_checkpoint()  # model_dir = self.pretrain_model_dir
+        # self.save_checkpoint(model_dir = self.pretrain_model_dir)  # model_dir = self.pretrain_model_dir
+        torch.save(self.torchmodel.model.state_dict(), os.path.join(self.pretrain_model_dir, "checkpoint.pt"))
 
 
 class ToyPretrainer(Pretrainer):
@@ -72,7 +75,6 @@ class ToyPretrainer(Pretrainer):
                  **kwargs): 
         torchmodel.loss = self._define_pretrain_loss()
         self.torchmodel = torchmodel
-        # self.model_dir = 
         self.embedding_dim = torchmodel.model._embedding.out_features
         self.old_head = torchmodel.model._head
         self.new_head = self._generate_head()
@@ -105,18 +107,20 @@ y = np.random.randint(2, size=(n_samples, n_tasks)).astype(np.float32)
 test_dataset = dc.data.NumpyDataset(X)
 
 
-toy = ToyTorchModel(input_size, hidden_layers, n_tasks)
+toy = ToyTorchModel(input_size, hidden_layers, n_tasks, model_dir = './testfolder')
 toy2 = ToyTorchModel(input_size, hidden_layers, n_tasks, model_dir = './testfolder')
 
-### load_from_pretrained() test
-# toy2.fit(ft_dataset, nb_epoch=100, checkpoint_interval=10) 
-# preds = toy2.predict(test_dataset)
-# print('toy2 preds: ', preds)
-# toy.load_from_pretrained(toy2, include_top=False, model_dir = toy2.model_dir)
-# preds = toy.predict(test_dataset)
-# print('toy preds: ', preds)
+### load_from_pretrained() 
 
 pretrainer = ToyPretrainer(toy2) # model_dir = './testfolder/pretrain'
-pretrainer.fit(pt_dataset, nb_epoch=100) 
+pretrainer.fit(pt_dataset, nb_epoch=100, checkpoint_interval=10) 
 
-toy.load_from_pretrained(toy2, include_top=True, model_dir = pretrainer.pretrain_model_dir) 
+# toy.load_from_pretrained(pretrainer, include_top=True, model_dir = './testfolder/pretrain') # works if you run fit, otherwise not bc optimizer params different 
+toy.model.load_state_dict(torch.load(os.path.join(pretrainer.pretrain_model_dir, "checkpoint.pt")))  # works, checkpoint is output from pretrainer.fit
+
+### load_from_pretrained() test, works
+preds = toy2.predict(test_dataset)
+print('toy2 preds: \n', preds)
+# toy.load_from_pretrained(toy2, include_top=False, model_dir = toy2.model_dir)
+preds = toy.predict(test_dataset)
+print('toy preds: \n', preds)
