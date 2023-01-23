@@ -94,7 +94,7 @@ toy = ToyTorchModel(input_size, d_hidden, n_tasks, model_dir = './testfolder1')
 toy2 = ToyTorchModel(input_size, d_hidden, n_tasks)
 
 pretrainer = ToyPretrainer(toy, pt_tasks=5, model_dir = './testfolder2') 
-# pretrainer.fit(pt_dataset, nb_epoch=100, checkpoint_interval=10) 
+pretrainer.fit(pt_dataset, nb_epoch=100, checkpoint_interval=10) 
 
 ### build new model, fit normally, then load from pretrained with only embedding
 toy2.load_from_pretrained(pretrainer, include_top=False, model_dir = './testfolder2') # works 
