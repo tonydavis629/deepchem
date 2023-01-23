@@ -1092,6 +1092,8 @@ class TorchModel(Model):
         """
         assignment_map: Dict[Any, Any] = {}
         
+        if source_model.embedding.parameters() is not None:
+            pass
         if not include_top:
             source_vars = list(source_model.embedding.parameters())
             dest_vars = list(self.embedding.parameters())

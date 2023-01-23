@@ -40,24 +40,13 @@ class Pretrainer(TorchModel):
         self.torchmodel.model.embedding.weight.requires_grad = True
     def _define_pretrain_loss(self):
         return NotImplementedError("Subclass must define the pretrain loss")
-    # def copy_model(self,torchmodel):
-    #     # assert isinstance(torchmodel, TorchModel)
-    #     self.build_embedding = torchmodel.build_embedding
-    #     self.build_model = torchmodel.build_model
         
 class ToyPretrainer(Pretrainer): 
     def __init__(self, 
                  model:ToyTorchModel,
                  pt_tasks:int,
                  **kwargs):
-        
-        # super().__init__(model, **kwargs)
-        # self.copy_model(model)
-        # self.embedding = self.build_embedding(model.embedding.in_features, model.embedding.out_features)
-        # self.head = self.build_head(model.embedding.out_features, pt_tasks)
-        # self.model = self.build_model(self.embedding, self.head)
-        # self.loss = self._define_pretrain_loss()
-         
+                 
         self.head = self.build_head(model.embedding.out_features, pt_tasks)
         
         self.build_embedding = model.build_embedding
