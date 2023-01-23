@@ -14,16 +14,19 @@ class ToyTorchModel(TorchModel):
                  input_dim, 
                  d_hidden, 
                  d_output, 
-                 **kwargs): 
+                 **kwargs):
+        self.input_dim = input_dim
+        self.d_hidden = d_hidden 
+        self.d_output = d_output
         self.loss = L2Loss()
-        self.head = self.build_head(d_hidden, d_output)
-        self.embedding = self.build_embedding(input_dim, d_hidden)
+        self.head = self.build_head()
+        self.embedding = self.build_embedding()
         self.model = self.build_model(self.embedding, self.head)
         super().__init__(self.model, self.loss, **kwargs) 
-    def build_embedding(self, input_dim, d_hidden):
-        return nn.Linear(input_dim, d_hidden)
-    def build_head(self, d_hidden, d_output):
-        return nn.Linear(d_hidden, d_output)
+    def build_embedding(self):
+        return nn.Linear(self.input_dim, self.d_hidden)
+    def build_head(self):
+        return nn.Linear(self.d_hidden, self.d_output)
     def build_model(self,embedding,head):
         return nn.Sequential(embedding, head)
 
@@ -38,22 +41,24 @@ class Pretrainer(TorchModel):
         self.torchmodel.model.embedding.weight.requires_grad = False
     def unfreeze_embedding(self):
         self.torchmodel.model.embedding.weight.requires_grad = True
+    def build_embedding(self):
+        return NotImplementedError("Subclass must define the embedding")
+    def build_head(self):
+        return NotImplementedError("Subclass must define the head")
     def _define_pretrain_loss(self):
         return NotImplementedError("Subclass must define the pretrain loss")
+    
         
 class ToyPretrainer(Pretrainer): 
     def __init__(self, 
                  model:ToyTorchModel,
                  pt_tasks:int,
                  **kwargs):
-                 
-        self.head = self.build_head(model.embedding.out_features, pt_tasks)
         
-        self.build_embedding = model.build_embedding
-        self.build_model = model.build_model
+        self.embedding = model.build_embedding()
+        self.head = self.build_head(model.d_hidden,pt_tasks)
         
-        self.embedding = self.build_embedding(model.embedding.in_features, model.embedding.out_features)
-        self.model = self.build_model(self.embedding, self.head)
+        self.model = model.build_model(self.embedding, self.head)
         self.loss = self._define_pretrain_loss()
         
         torchmodel = TorchModel(self.model, self.loss, **kwargs)
@@ -86,10 +91,10 @@ test_dataset = dc.data.NumpyDataset(X)
 
 
 toy = ToyTorchModel(input_size, d_hidden, n_tasks, model_dir = './testfolder1')
-toy2 = ToyTorchModel(input_size, d_hidden, n_tasks, model_dir = './testfolder2')
+toy2 = ToyTorchModel(input_size, d_hidden, n_tasks)
 
 pretrainer = ToyPretrainer(toy, pt_tasks=5, model_dir = './testfolder2') 
-pretrainer.fit(pt_dataset, nb_epoch=100, checkpoint_interval=10) 
+# pretrainer.fit(pt_dataset, nb_epoch=100, checkpoint_interval=10) 
 
 ### build new model, fit normally, then load from pretrained with only embedding
 toy2.load_from_pretrained(pretrainer, include_top=False, model_dir = './testfolder2') # works 
