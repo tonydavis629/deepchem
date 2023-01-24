@@ -35,10 +35,15 @@ class Pretrainer(TorchModel):
         super().__init__(torchmodel.model, torchmodel.loss, **kwargs)
 
     def freeze_embedding(self):
-        self.torchmodel.model.embedding.weight.requires_grad = False
+        # self.torchmodel.model.embedding.weight.requires_grad = False
+        self.get_embedding().weight.requires_grad = False
 
     def unfreeze_embedding(self):
-        self.torchmodel.model.embedding.weight.requires_grad = True
+        # self.torchmodel.model.embedding.weight.requires_grad = True
+        self.get_embedding().weight.requires_grad = True
+        
+    def build_embedding(self):
+        return NotImplementedError("Subclass must define the embedding")
 
     def build_head(self):
         return NotImplementedError("Subclass must define the head")
@@ -89,6 +94,7 @@ toy = ToyTorchModel(input_size, d_hidden, n_tasks, model_dir='./folder1')
 toy2 = ToyTorchModel(input_size, d_hidden, n_tasks)
 
 pretrainer = ToyPretrainer(toy, pt_tasks=5, model_dir='./folder2')
+pretrainer.freeze_embedding()
 pretrainer.fit(pt_dataset, nb_epoch=100, checkpoint_interval=10)
 
 toy2.load_from_pretrained(pretrainer,
