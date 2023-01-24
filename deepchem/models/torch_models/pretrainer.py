@@ -34,15 +34,12 @@ class Pretrainer(TorchModel):
     """does not modify internal state of model"""
     def __init__(self,
                  torchmodel:TorchModel,
-                 model_dir:str,
                  **kwargs): 
-        super().__init__(torchmodel.model, torchmodel.loss, model_dir=model_dir,**kwargs) 
+        super().__init__(torchmodel.model, torchmodel.loss, **kwargs) 
     def freeze_embedding(self):
         self.torchmodel.model.embedding.weight.requires_grad = False
     def unfreeze_embedding(self):
         self.torchmodel.model.embedding.weight.requires_grad = True
-    def build_embedding(self):
-        return NotImplementedError("Subclass must define the embedding")
     def build_head(self):
         return NotImplementedError("Subclass must define the head")
     def _define_pretrain_loss(self):
@@ -67,6 +64,7 @@ class ToyPretrainer(Pretrainer):
         
     def _define_pretrain_loss(self):
         return L1Loss()
+    
     def build_head(self, d_hidden, pt_tasks): 
         return nn.Linear(d_hidden, pt_tasks)
 
@@ -94,7 +92,7 @@ toy = ToyTorchModel(input_size, d_hidden, n_tasks, model_dir = './testfolder1')
 toy2 = ToyTorchModel(input_size, d_hidden, n_tasks)
 
 pretrainer = ToyPretrainer(toy, pt_tasks=5, model_dir = './testfolder2') 
-pretrainer.fit(pt_dataset, nb_epoch=100, checkpoint_interval=10) 
+# pretrainer.fit(pt_dataset, nb_epoch=100, checkpoint_interval=10) 
 
 ### build new model, fit normally, then load from pretrained with only embedding
 toy2.load_from_pretrained(pretrainer, include_top=False, model_dir = './testfolder2') # works 
