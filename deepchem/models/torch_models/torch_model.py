@@ -1093,8 +1093,8 @@ class TorchModel(Model):
         assignment_map: Dict[Any, Any] = {}
         
         if hasattr(source_model, 'embedding') and not include_top:
-            source_vars = list(source_model.get_embedding().parameters())
-            dest_vars = list(self.get_embedding().parameters())
+            source_vars = list(source_model.embedding().parameters())
+            dest_vars = list(self.embedding().parameters())
         else:
             source_vars = list(source_model.model.parameters())
             dest_vars = list(self.model.parameters())

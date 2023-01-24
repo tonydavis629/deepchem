@@ -4,15 +4,21 @@ from deepchem.models.losses import L2Loss, L1Loss
 import torch.nn as nn
 import numpy as np
 
+
 class PretrainableTorchModel(TorchModel):
-    def get_embedding():
+    @property
+    def embedding():
         return NotImplementedError("Subclass must define the embedding")
+
     def build_embedding(self):
         return NotImplementedError("Subclass must define the embedding")
+
     def build_head(self):
         return NotImplementedError("Subclass must define the head")
+
     def build_model(self):
         return NotImplementedError("Subclass must define the model")
+
 
 class ToyTorchModel(PretrainableTorchModel):
     """Example TorchModel for testing pretraining."""
@@ -22,13 +28,14 @@ class ToyTorchModel(PretrainableTorchModel):
         self.d_hidden = d_hidden
         self.d_output = d_output
         self.loss = L2Loss()
-        self.head = self.build_head()
-        self.embedding = self.build_embedding()
-        self.model = self.build_model(self.embedding, self.head)
-        super().__init__(self.model, self.loss, **kwargs)
-        
-    def get_embedding(self):
-        return self.embedding
+        self._head = self.build_head()
+        self._embedding = self.build_embedding()
+        self._model = self.build_model(self._embedding, self._head)
+        super().__init__(self._model, self.loss, **kwargs)
+
+    @property
+    def embedding(self):
+        return self._embedding
 
     def build_embedding(self):
         return nn.Linear(self.input_dim, self.d_hidden)
@@ -46,9 +53,10 @@ class Pretrainer(TorchModel):
     def __init__(self, torchmodel: PretrainableTorchModel, **kwargs):
         super().__init__(torchmodel.model, torchmodel.loss, **kwargs)
 
-    def get_embedding(self):
+    @property
+    def embedding(self):
         return NotImplementedError("Subclass must define the embedding")
-        
+
     def build_pretrain_loss(self):
         return NotImplementedError("Subclass must define the pretrain loss")
 
@@ -58,21 +66,23 @@ class ToyPretrainer(Pretrainer):
 
     def __init__(self, model: ToyTorchModel, pt_tasks: int, **kwargs):
 
-        self.embedding = model.build_embedding()
-        self.head = self.build_head(model.d_hidden, pt_tasks)
-        self.model = model.build_model(self.embedding, self.head)
+        self._embedding = model.build_embedding()
+        self._head = self.build_head(model.d_hidden, pt_tasks)
+        self._model = model.build_model(self._embedding, self._head)
         self.loss = self.build_pretrain_loss()
-        torchmodel = TorchModel(self.model, self.loss, **kwargs)
+        torchmodel = TorchModel(self._model, self.loss, **kwargs)
         super().__init__(torchmodel, **kwargs)
 
+    @property
+    def embedding(self):  # use in load_from_pretrained
+        return self._embedding
+    
     def build_pretrain_loss(self):
         return L1Loss()
 
     def build_head(self, d_hidden, pt_tasks):
         return nn.Linear(d_hidden, pt_tasks)
-    
-    def get_embedding(self): # use in load_from_pretrained
-        return self.embedding
+
 
 
 np.random.seed(123)
@@ -98,20 +108,14 @@ toy = ToyTorchModel(input_size, d_hidden, n_tasks, model_dir='./folder1')
 toy2 = ToyTorchModel(input_size, d_hidden, n_tasks)
 
 pretrainer = ToyPretrainer(toy, pt_tasks=5, model_dir='./folder2')
-# pretrainer.freeze_embedding()
-# pretrainer.fit(pt_dataset, nb_epoch=100, checkpoint_interval=10)
+pretrainer.fit(pt_dataset, nb_epoch=100, checkpoint_interval=10)
 
-toy2.load_from_pretrained(pretrainer,
-                          include_top=False,
-                          model_dir='./folder2')
+toy2.load_from_pretrained(pretrainer, include_top=False, model_dir='./folder2') #memory issues potentially
 
 # Freeze embedding for finetuning
-# toy2.embedding.requires_grad = False
+toy2.embedding.requires_grad = False
 
 toy2.fit(ft_dataset, nb_epoch=100, checkpoint_interval=10)
 
-toy.fit(ft_dataset, nb_epoch=100, checkpoint_interval=10)
 preds = toy2.predict(test_dataset)
 print('toy2 preds: \n', preds)
-preds = toy.predict(test_dataset)
-print('toy preds: \n', preds)
