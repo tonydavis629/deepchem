@@ -1,13 +1,13 @@
-import os
+# import os
 import pytest
 import deepchem as dc
 import numpy as np
-import math
-import unittest
-import torch
-from pretrainer import Pretrainer, PretrainableTorchModel
+# import math
+# import unittest
+# import torch
+from deepchem.models.torch_models.pretrainer import Pretrainer, PretrainableTorchModel
 import torch.nn as nn
-from torch_model import TorchModel
+from deepchem.models.torch_models.torch_model import TorchModel
 
 
 @pytest.mark.torch
