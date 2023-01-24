@@ -85,15 +85,15 @@ X = np.random.rand(n_samples, input_size)
 y = np.random.randint(2, size=(n_samples, n_tasks)).astype(np.float32)
 test_dataset = dc.data.NumpyDataset(X)
 
-toy = ToyTorchModel(input_size, d_hidden, n_tasks, model_dir='./testfolder1')
+toy = ToyTorchModel(input_size, d_hidden, n_tasks, model_dir='./folder1')
 toy2 = ToyTorchModel(input_size, d_hidden, n_tasks)
 
-pretrainer = ToyPretrainer(toy, pt_tasks=5, model_dir='./testfolder2')
+pretrainer = ToyPretrainer(toy, pt_tasks=5, model_dir='./folder2')
 pretrainer.fit(pt_dataset, nb_epoch=100, checkpoint_interval=10)
 
 toy2.load_from_pretrained(pretrainer,
                           include_top=False,
-                          model_dir='./testfolder2')
+                          model_dir='./folder2')
 toy2.fit(ft_dataset, nb_epoch=100, checkpoint_interval=10)
 
 toy.fit(ft_dataset, nb_epoch=100, checkpoint_interval=10)
