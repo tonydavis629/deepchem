@@ -117,18 +117,3 @@ chemfold.to('cuda')
 with torch.no_grad():
   chemfold.eval()
   output = chemfold(processed_feature_dict)
-
-# %% [markdown]
-# #### Display the output
-
-# %%
-from deepchem.utils import protein # protein helper functions, with protein dataclass
-import py3Dmol
-
-unrelaxed_protein = protein.from_prediction(processed_feature_dict, output)
-visualize_pdb =  protein.visualize(unrelaxed_protein)
-
-view = py3Dmol.view(width=800, height=600)
-view.addModelsAsFrames(visualize_pdb)
-
-
