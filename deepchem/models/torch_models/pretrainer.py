@@ -5,11 +5,13 @@ import torch.nn as nn
 import numpy as np
 
 class PretrainableTorchModel(TorchModel):
-    def build_embedding():
+    def get_embedding():
         return NotImplementedError("Subclass must define the embedding")
-    def build_head():
+    def build_embedding(self):
+        return NotImplementedError("Subclass must define the embedding")
+    def build_head(self):
         return NotImplementedError("Subclass must define the head")
-    def build_model(embedding, head):
+    def build_model(self):
         return NotImplementedError("Subclass must define the model")
 
 class ToyTorchModel(PretrainableTorchModel):
@@ -24,6 +26,9 @@ class ToyTorchModel(PretrainableTorchModel):
         self.embedding = self.build_embedding()
         self.model = self.build_model(self.embedding, self.head)
         super().__init__(self.model, self.loss, **kwargs)
+        
+    def get_embedding(self):
+        return self.embedding
 
     def build_embedding(self):
         return nn.Linear(self.input_dim, self.d_hidden)
@@ -33,21 +38,12 @@ class ToyTorchModel(PretrainableTorchModel):
 
     def build_model(self, embedding, head):
         return nn.Sequential(embedding, head)
-    
-    # put into pretraineable torchmodel, don't need specific functions for freeze embedding
-    # def freeze_embedding(self):
-    #     # self.torchmodel.model.embedding.weight.requires_grad = False
-    #     self.get_embedding().weight.requires_grad = False
-
-    # def unfreeze_embedding(self):
-    #     # self.torchmodel.model.embedding.weight.requires_grad = True
-    #     self.get_embedding().weight.requires_grad = True 
 
 
 class Pretrainer(TorchModel):
     """Abstract pretrainer class. This class is meant to be subclassed for pretraining TorchModels."""
 
-    def __init__(self, torchmodel: TorchModel, **kwargs):
+    def __init__(self, torchmodel: PretrainableTorchModel, **kwargs):
         super().__init__(torchmodel.model, torchmodel.loss, **kwargs)
 
     def get_embedding(self):
@@ -62,7 +58,6 @@ class ToyPretrainer(Pretrainer):
 
     def __init__(self, model: ToyTorchModel, pt_tasks: int, **kwargs):
 
-        # self.orgmodel = model
         self.embedding = model.build_embedding()
         self.head = self.build_head(model.d_hidden, pt_tasks)
         self.model = model.build_model(self.embedding, self.head)
@@ -104,11 +99,15 @@ toy2 = ToyTorchModel(input_size, d_hidden, n_tasks)
 
 pretrainer = ToyPretrainer(toy, pt_tasks=5, model_dir='./folder2')
 # pretrainer.freeze_embedding()
-pretrainer.fit(pt_dataset, nb_epoch=100, checkpoint_interval=10)
+# pretrainer.fit(pt_dataset, nb_epoch=100, checkpoint_interval=10)
 
 toy2.load_from_pretrained(pretrainer,
                           include_top=False,
                           model_dir='./folder2')
+
+# Freeze embedding for finetuning
+# toy2.embedding.requires_grad = False
+
 toy2.fit(ft_dataset, nb_epoch=100, checkpoint_interval=10)
 
 toy.fit(ft_dataset, nb_epoch=100, checkpoint_interval=10)
