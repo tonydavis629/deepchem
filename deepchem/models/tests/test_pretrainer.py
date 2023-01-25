@@ -11,13 +11,17 @@ from deepchem.models.torch_models.torch_model import TorchModel
 
 
 @pytest.mark.torch
-def test_overfit_subclass_model():
+def test_overfit_pretrainer():
     """Test fitting a TorchModel defined by subclassing Module."""
-    n_data_points = 10
-    n_features = 2
-    np.random.seed(1234)
-    X = np.random.rand(n_data_points, n_features)
-    y = (X[:, 0] > X[:, 1]).astype(np.float32)
+    np.random.seed(123)
+    n_samples = 10
+    input_size = 15
+    d_hidden = 2
+    n_tasks = 3
+    pt_tasks = 5
+
+    X = np.random.rand(n_samples, input_size)
+    y = np.random.randint(2, size=(n_samples, pt_tasks)).astype(np.float32)
     dataset = dc.data.NumpyDataset(X, y)
     
     class ExampleTorchModel(PretrainableTorchModel):
@@ -68,11 +72,8 @@ def test_overfit_subclass_model():
         def build_head(self, d_hidden, pt_tasks):
             return nn.Linear(d_hidden, pt_tasks)
 
-    input_dim = 10
-    d_hidden = 3
-    d_output = 4
-    pt_tasks = 7
-    example_model = ExampleTorchModel(input_dim, d_hidden, d_output)
+
+    example_model = ExampleTorchModel(input_size, d_hidden, n_tasks)
     pretrainer = ExamplePretrainer(example_model, pt_tasks)
 
     pretrainer.fit(dataset, nb_epoch=1000)
@@ -81,3 +82,11 @@ def test_overfit_subclass_model():
     metric = dc.metrics.Metric(dc.metrics.roc_auc_score)
     scores = pretrainer.evaluate(dataset, [metric])
     assert scores[metric.name] > 0.9
+
+# @pytest.mark.torch
+# def test_freeze_embedding():
+#     pass
+
+# @pytest.mark.torch
+# def test_load_from_pretrainer():
+#     pass
