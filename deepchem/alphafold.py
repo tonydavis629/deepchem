@@ -8,7 +8,7 @@ num_residues = len(sequence)
 # Use jackhmmr to identify homologous protein structures 
 
 # %%
-from deepchem.utils.alphafold_utils.jackhammer import Jackhmmer
+from deepchem.utils.jackhammer import Jackhmmer
 
 msas, deletion_matrices = Jackhmmer(sequence, dbs = ['uniref90', 'smallbfd', 'mgnify'])
 
