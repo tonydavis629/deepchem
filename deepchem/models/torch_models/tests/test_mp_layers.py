@@ -8,7 +8,7 @@ import os
 # import numpy as np
 
 
-def mol_to_graph_data_obj_simple(mol):
+# def mol_to_graph_data_obj_simple(mol):
 
 
 @pytest.mark.torch
@@ -25,7 +25,7 @@ def gen_dataset():
                                featurizer=SNAPfeaturizer())
     # need to implement simple GraphFeaturizer to take in smiles and output GraphData
     dataset = loader.create_dataset(path)
-    # dataset = [mol_to_graph_data_obj_simple(mol) for mol in dataset.X]
+    dataset = [mol.to_pyg_graph() for mol in dataset.X]
     return dataset
 
 
@@ -33,8 +33,11 @@ def gen_dataset():
 def test_GINConv():
     from deepchem.models.torch_models.mp_layers import GINConv
     layer = GINConv(emb_dim=10)
-    dataset = gen_dataset()[0]
-    output = layer(dataset.x, dataset.edge_index, dataset.edge_attr)
+    dataset = gen_dataset()
+    input = dataset[0]
+    input.edge_attr = input.edge_attr.long()
+    # data expects GNN, not layer
+    output = layer(input.x, input.edge_index, input.edge_attr)
     print(output)
 test_GINConv()
 
