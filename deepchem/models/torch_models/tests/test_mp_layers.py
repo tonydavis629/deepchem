@@ -1,8 +1,14 @@
 import deepchem as dc
-from deepchem.feat import MolGraphConvFeaturizer
-from deepchem.feat.graph_data import GraphData
+from deepchem.feat.molecule_featurizers.snap_featurizer import SNAPfeaturizer
+
 import pytest
 import os
+# import torch
+# from rdkit import Chem
+# import numpy as np
+
+
+def mol_to_graph_data_obj_simple(mol):
 
 
 @pytest.mark.torch
@@ -16,10 +22,10 @@ def gen_dataset():
     # path = 'deepchem/models/tests/assets/example_classification.csv'
     loader = dc.data.CSVLoader(tasks=["outcome"],
                                feature_field="smiles",
-                               featurizer=MolGraphConvFeaturizer(use_edges=True))
+                               featurizer=SNAPfeaturizer())
     # need to implement simple GraphFeaturizer to take in smiles and output GraphData
     dataset = loader.create_dataset(path)
-    dataset = [mol.to_pyg_graph() for mol in dataset.X]
+    # dataset = [mol_to_graph_data_obj_simple(mol) for mol in dataset.X]
     return dataset
 
 
