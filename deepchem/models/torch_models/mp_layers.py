@@ -26,6 +26,7 @@ class GINConv(MessagePassing):
 
     See https://arxiv.org/abs/1810.00826
     """
+
     def __init__(self, emb_dim, aggr="add"):
         super(GINConv, self).__init__()
         # multi-layer perceptron
@@ -46,8 +47,7 @@ class GINConv(MessagePassing):
         # add features corresponding to self-loop edges.
         self_loop_attr = torch.zeros(x.shape[0], 2)
         self_loop_attr[:, 0] = 4  # bond type for self-loop edge
-        self_loop_attr = self_loop_attr.to(edge_attr.device).to(
-            edge_attr.dtype)
+        self_loop_attr = self_loop_attr.to(edge_attr.device).to(edge_attr.dtype)
         edge_attr = torch.cat((edge_attr, self_loop_attr), dim=0)
 
         edge_embeddings = self.edge_embedding1(
@@ -65,6 +65,7 @@ class GINConv(MessagePassing):
 
 
 class GCNConv(MessagePassing):
+
     def __init__(self, emb_dim, aggr="add"):
         super(GCNConv, self).__init__()
 
@@ -80,7 +81,7 @@ class GCNConv(MessagePassing):
 
     def norm(self, edge_index, num_nodes, dtype):
         # assuming that self-loops have been already added in edge_index
-        edge_weight = torch.ones((edge_index.shape(1), ),
+        edge_weight = torch.ones((edge_index.shape[1],),
                                  dtype=dtype,
                                  device=edge_index.device)
         row, col = edge_index
@@ -92,13 +93,12 @@ class GCNConv(MessagePassing):
 
     def forward(self, x, edge_index, edge_attr):
         # add self loops in the edge space
-        edge_index = add_self_loops(edge_index, num_nodes=x.shape[0])
+        edge_index, _ = add_self_loops(edge_index, num_nodes=x.shape[0])
 
         # add features corresponding to self-loop edges.
         self_loop_attr = torch.zeros(x.shape[0], 2)
         self_loop_attr[:, 0] = 4  # bond type for self-loop edge
-        self_loop_attr = self_loop_attr.to(edge_attr.device).to(
-            edge_attr.dtype)
+        self_loop_attr = self_loop_attr.to(edge_attr.device).to(edge_attr.dtype)
         edge_attr = torch.cat((edge_attr, self_loop_attr), dim=0)
 
         edge_embeddings = self.edge_embedding1(
@@ -108,8 +108,7 @@ class GCNConv(MessagePassing):
 
         x = self.linear(x)
 
-        return self.propagate(self.aggr,
-                              edge_index,
+        return self.propagate(edge_index,
                               x=x,
                               edge_attr=edge_embeddings,
                               norm=norm)
@@ -119,6 +118,7 @@ class GCNConv(MessagePassing):
 
 
 class GATConv(MessagePassing):
+
     def __init__(self, emb_dim, heads=2, negative_slope=0.2, aggr="add"):
         super(GATConv, self).__init__()
 
@@ -150,23 +150,19 @@ class GATConv(MessagePassing):
     def forward(self, x, edge_index, edge_attr):
 
         # add self loops in the edge space
-        edge_index = add_self_loops(edge_index, num_nodes=x.shape[0])
+        edge_index, _ = add_self_loops(edge_index, num_nodes=x.shape[0])
 
         # add features corresponding to self-loop edges.
         self_loop_attr = torch.zeros(x.shape[0], 2)
         self_loop_attr[:, 0] = 4  # bond type for self-loop edge
-        self_loop_attr = self_loop_attr.to(edge_attr.device).to(
-            edge_attr.dtype)
+        self_loop_attr = self_loop_attr.to(edge_attr.device).to(edge_attr.dtype)
         edge_attr = torch.cat((edge_attr, self_loop_attr), dim=0)
 
         edge_embeddings = self.edge_embedding1(
             edge_attr[:, 0]) + self.edge_embedding2(edge_attr[:, 1])
 
-        x = self.weight_linear(x).view(-1, self.heads, self.emb_dim)
-        return self.propagate(self.aggr,
-                              edge_index,
-                              x=x,
-                              edge_attr=edge_embeddings)
+        x = self.weight_linear(x).view(-1, self.heads, self.emb_dim) # changes x dimension from (num_nodes, emb_dim) to (num_nodes, heads, emb_dim)
+        return self.propagate(edge_index, x=x, edge_attr=edge_embeddings)
 
     def message(self, edge_index, x_i, x_j, edge_attr):
         edge_attr = edge_attr.view(-1, self.heads, self.emb_dim)
@@ -187,6 +183,7 @@ class GATConv(MessagePassing):
 
 
 class GraphSAGEConv(MessagePassing):
+
     def __init__(self, emb_dim, aggr="mean"):
         super(GraphSAGEConv, self).__init__()
 
@@ -202,13 +199,12 @@ class GraphSAGEConv(MessagePassing):
 
     def forward(self, x, edge_index, edge_attr):
         # add self loops in the edge space
-        edge_index = add_self_loops(edge_index, num_nodes=x.shape[0])
+        edge_index, _ = add_self_loops(edge_index, num_nodes=x.shape[0])
 
         # add features corresponding to self-loop edges.
         self_loop_attr = torch.zeros(x.shape[0], 2)
         self_loop_attr[:, 0] = 4  # bond type for self-loop edge
-        self_loop_attr = self_loop_attr.to(edge_attr.device).to(
-            edge_attr.dtype)
+        self_loop_attr = self_loop_attr.to(edge_attr.device).to(edge_attr.dtype)
         edge_attr = torch.cat((edge_attr, self_loop_attr), dim=0)
 
         edge_embeddings = self.edge_embedding1(
@@ -216,10 +212,7 @@ class GraphSAGEConv(MessagePassing):
 
         x = self.linear(x)
 
-        return self.propagate(self.aggr,
-                              edge_index,
-                              x=x,
-                              edge_attr=edge_embeddings)
+        return self.propagate(edge_index, x=x, edge_attr=edge_embeddings)
 
     def message(self, x_j, edge_attr):
         return x_j + edge_attr
