@@ -163,6 +163,12 @@ Torch Layers
 .. autoclass:: deepchem.models.torch_models.layers.DMPNNEncoderLayer
   :members:
 
+.. autoclass:: deepchem.models.torch_models.InfoGraphEncoder
+  :members:
+
+.. autoclass:: deepchem.models.torch_models.GINEncoder
+  :members:
+
 Grover Layers
 ^^^^^^^^^^^^^
 
@@ -180,7 +186,19 @@ The following layers are used for implementing GROVER model as described in the 
 .. autoclass:: deepchem.models.torch_models.grover_layers.GroverTransEncoder
   :members:
 
-.. autoclass:: deepchem.models.torch_models.grover.GroverEmbedding
+.. autoclass:: deepchem.models.torch_models.grover_layers.GroverEmbedding
+  :members:
+
+.. autoclass:: deepchem.models.torch_models.grover_layers.GroverEmbedding
+  :members:
+
+.. autoclass:: deepchem.models.torch_models.grover_layers.GroverAtomVocabPredictor
+  :members:
+
+.. autoclass:: deepchem.models.torch_models.grover_layers.GroverBondVocabPredictor
+  :members:
+
+.. autoclass:: deepchem.models.torch_models.grover_layers.GroverFunctionalGroupPredictor
   :members:
 
 Attention Layers
@@ -191,6 +209,12 @@ Attention Layers
 
 .. autoclass:: deepchem.models.torch_models.attention.SelfAttention
   :members:
+
+Readout Layers
+^^^^^^^^^^^^^^
+
+.. autoclass:: deepchem.models.torch_models.readout.GroverReadout
+   :members:
 
 Jax Layers
 ----------

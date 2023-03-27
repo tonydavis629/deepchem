@@ -96,6 +96,12 @@ Losses
 .. autoclass:: deepchem.models.losses.ShannonEntropy
   :members:
 
+.. autoclass:: deepchem.models.losses.GlobalMutualInformationLoss
+  :members:
+
+.. autoclass:: deepchem.models.losses.LocalMutualInformationLoss
+  :members:
+
 Optimizers
 ----------
 
@@ -391,6 +397,18 @@ Note that this is an alternative implementation for MPNN and currently you can o
 ``deepchem.models.torch_models``.
 
 .. autoclass:: deepchem.models.torch_models.MPNNModel
+  :members:
+
+InfoGraphModel
+--------------
+
+.. autoclass:: deepchem.models.torch_models.InfoGraphModel
+  :members:
+
+InfoGraphStarModel
+--------------
+
+.. autoclass:: deepchem.models.torch_models.InfoGraphStarModel
   :members:
 
 LCNNModel
