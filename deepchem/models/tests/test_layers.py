@@ -4,7 +4,7 @@ import pytest
 
 try:
     import tensorflow as tf
-    import deepchem.models.layers as layers
+    import deepchem.models.tensorflow_models.layers as layers
     from tensorflow.python.framework import test_util  # noqa: F401
     has_tensorflow = True
 except ModuleNotFoundError:

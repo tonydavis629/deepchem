@@ -10,7 +10,7 @@ from deepchem.data import NumpyDataset
 try:
     import tensorflow as tf
     import tensorflow_probability as tfp
-    from deepchem.models.normalizing_flows import NormalizingFlow, NormalizingFlowModel
+    from deepchem.models.tensorflow_models.normalizing_flows import NormalizingFlow, NormalizingFlowModel
     tfd = tfp.distributions
     tfb = tfp.bijectors
     has_tensorflow_probablity = True

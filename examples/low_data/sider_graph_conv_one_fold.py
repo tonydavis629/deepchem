@@ -9,7 +9,7 @@ import tempfile
 import numpy as np
 import tensorflow as tf
 import deepchem as dc
-from deepchem.models.graph_models import GraphConvModel
+from deepchem.models.tensorflow_models.graph_models import GraphConvModel
 
 # 4-fold splits
 K = 4

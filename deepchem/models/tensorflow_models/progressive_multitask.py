@@ -1,11 +1,12 @@
 import numpy as np
+from deepchem.models.tensorflow_models import layers
 import tensorflow as tf
 from collections.abc import Sequence as SequenceCollection
 
 import logging
-from deepchem.models import KerasModel, layers
+from deepchem.models import KerasModel
 from deepchem.models.losses import L2Loss, SparseSoftmaxCrossEntropy
-from deepchem.models.keras_model import _StandardLoss
+from deepchem.models.tensorflow_models.keras_model import _StandardLoss
 from tensorflow.keras.layers import Input, Dense, Dropout, ReLU, Concatenate, Add, Multiply, Softmax
 
 logger = logging.getLogger(__name__)

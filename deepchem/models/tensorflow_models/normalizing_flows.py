@@ -7,7 +7,7 @@ from typing import List, Optional, Sequence, Callable
 
 import tensorflow as tf
 
-from deepchem.models.keras_model import KerasModel
+from deepchem.models.tensorflow_models.keras_model import KerasModel
 from deepchem.utils.typing import OneOrMany
 from deepchem.utils.data_utils import load_from_disk, save_to_disk
 

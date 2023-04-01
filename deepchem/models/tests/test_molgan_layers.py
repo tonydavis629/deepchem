@@ -5,7 +5,7 @@ try:
     from tensorflow import keras
     from tensorflow.keras.layers import Input
     from tensorflow.keras import activations
-    from deepchem.models.layers import MolGANConvolutionLayer, MolGANMultiConvolutionLayer, MolGANAggregationLayer, MolGANEncoderLayer
+    from deepchem.models.tensorflow_models.layers import MolGANConvolutionLayer, MolGANMultiConvolutionLayer, MolGANAggregationLayer, MolGANEncoderLayer
     has_tensorflow = True
 except:
     has_tensorflow = False

@@ -14,7 +14,7 @@ from sklearn import svm
 import tensorflow as tf
 tf.random.set_seed(123)
 import deepchem as dc
-from deepchem.models.graph_models import GraphConvModel
+from deepchem.models.tensorflow_models.graph_models import GraphConvModel
 
 BATCH_SIZE = 128
 # Set to higher values to get better numbers

@@ -14,7 +14,7 @@ import tensorflow as tf
 tf.random.set_seed(123)
 import deepchem as dc
 from deepchem.molnet import load_tox21
-from deepchem.models.graph_models import PetroskiSuchModel
+from deepchem.models.tensorflow_models.graph_models import PetroskiSuchModel
 
 model_dir = "/tmp/graph_conv"
 

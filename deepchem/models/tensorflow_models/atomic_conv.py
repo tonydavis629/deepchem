@@ -1,6 +1,6 @@
 import logging
 from deepchem.models import KerasModel
-from deepchem.models.layers import AtomicConvolution
+from deepchem.models.tensorflow_models.layers import AtomicConvolution
 from deepchem.models.losses import L2Loss
 from tensorflow.keras.layers import Input, Dense, Reshape, Dropout, Activation, Lambda, Flatten, Concatenate
 

@@ -5,7 +5,7 @@ import logging
 import deepchem as dc
 from deepchem.metrics import to_one_hot
 from deepchem.models import KerasModel
-from deepchem.models.layers import Stack
+from deepchem.models.tensorflow_models.layers import Stack
 from deepchem.models.losses import SoftmaxCrossEntropy, L2Loss
 from typing import Tuple, Iterable, List
 

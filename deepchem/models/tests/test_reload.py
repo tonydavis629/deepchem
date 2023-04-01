@@ -294,7 +294,7 @@ def test_robust_multitask_classification_reload():
 
 @pytest.mark.tensorflow
 def test_atomic_conv_model_reload():
-    from deepchem.models.atomic_conv import AtomicConvModel
+    from deepchem.models.tensorflow_models.atomic_conv import AtomicConvModel
     from deepchem.data import NumpyDataset
     model_dir = tempfile.mkdtemp()
     batch_size = 1
@@ -361,7 +361,7 @@ def test_atomic_conv_model_reload():
 @pytest.mark.tensorflow
 def test_normalizing_flow_model_reload():
     """Test that NormalizingFlowModel can be reloaded correctly."""
-    from deepchem.models.normalizing_flows import NormalizingFlow, NormalizingFlowModel
+    from deepchem.models.tensorflow_models.normalizing_flows import NormalizingFlow, NormalizingFlowModel
     import tensorflow_probability as tfp
     tfd = tfp.distributions
     tfb = tfp.bijectors

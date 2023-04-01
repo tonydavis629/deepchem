@@ -14,7 +14,7 @@ from deepchem.data.datasets import pad_batch
 from deepchem.models import KerasModel
 from deepchem.models.losses import L2Loss, SoftmaxCrossEntropy, SigmoidCrossEntropy
 from deepchem.metrics import to_one_hot
-from deepchem.models import chemnet_layers
+from deepchem.models.tensorflow_models import chemnet_layers
 from tensorflow.keras.layers import Input, Dense, Reshape, Softmax, Activation
 from tensorflow.keras.layers import Conv1D, GRU, LSTM, Bidirectional
 from tensorflow.keras.layers import GlobalAveragePooling2D

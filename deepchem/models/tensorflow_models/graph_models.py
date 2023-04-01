@@ -2,6 +2,7 @@ from collections.abc import Sequence as SequenceCollection
 
 import deepchem as dc
 import numpy as np
+from deepchem.models.tensorflow_models import layers
 import tensorflow as tf
 
 from typing import List, Union, Tuple, Iterable, Dict, Optional
@@ -9,7 +10,7 @@ from deepchem.utils.typing import OneOrMany, LossFn, ActivationFn
 from deepchem.data import Dataset, pad_features
 from deepchem.feat.mol_graphs import ConvMol
 from deepchem.metrics import to_one_hot
-from deepchem.models import KerasModel, layers
+from deepchem.models import KerasModel
 from deepchem.models.losses import L2Loss, SoftmaxCrossEntropy, Loss
 from tensorflow.keras.layers import Input, Dense, Reshape, Softmax, Dropout, Activation, BatchNormalization
 

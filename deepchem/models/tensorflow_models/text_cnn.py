@@ -4,12 +4,13 @@ Created on Thu Sep 28 15:17:50 2017
 @author: zqwu
 """
 import numpy as np
+from deepchem.models.tensorflow_models import layers
 import tensorflow as tf
 import copy
 import sys
 
 from deepchem.metrics import to_one_hot
-from deepchem.models import KerasModel, layers
+from deepchem.models import KerasModel
 from deepchem.models.losses import L2Loss, SoftmaxCrossEntropy
 from tensorflow.keras.layers import Input, Dense, Reshape, Softmax, Dropout, Conv1D, Concatenate, Lambda
 

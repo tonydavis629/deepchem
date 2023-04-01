@@ -1,7 +1,8 @@
 import numpy as np
+from deepchem.models.tensorflow_models import layers
 import tensorflow as tf
 
-from deepchem.models import KerasModel, layers
+from deepchem.models import KerasModel
 from deepchem.models.losses import SigmoidCrossEntropy
 from tensorflow.keras.layers import Input, Layer, Activation, Concatenate, Lambda
 

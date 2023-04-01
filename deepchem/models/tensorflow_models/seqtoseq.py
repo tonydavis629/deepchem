@@ -1,8 +1,9 @@
 """Sequence to sequence translation models."""
 
-from deepchem.models import KerasModel, layers
+from deepchem.models import KerasModel
 from heapq import heappush, heappushpop
 import numpy as np
+from deepchem.models.tensorflow_models import layers
 import tensorflow as tf
 from tensorflow.keras.layers import Input, Layer, Dense, Dropout, GRU, Lambda, Conv1D, Flatten, BatchNormalization
 

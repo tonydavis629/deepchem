@@ -3,7 +3,7 @@ from typing import Optional, List, Tuple, Any
 import tensorflow as tf
 from deepchem.feat.molecule_featurizers.molgan_featurizer import GraphMatrix
 from deepchem.models import WGAN
-from deepchem.models.layers import MolGANEncoderLayer
+from deepchem.models.tensorflow_models.layers import MolGANEncoderLayer
 from tensorflow import keras
 from tensorflow.keras import layers
 
