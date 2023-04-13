@@ -96,6 +96,24 @@ Losses
 .. autoclass:: deepchem.models.losses.ShannonEntropy
   :members:
 
+.. autoclass:: deepchem.models.losses.GlobalMutualInformationLoss
+  :members:
+
+.. autoclass:: deepchem.models.losses.LocalMutualInformationLoss
+  :members:
+
+.. autoclass:: deepchem.models.losses.GroverPretrainLoss
+  :members:
+
+.. autoclass:: deepchem.models.losses.EdgePredictionLoss
+  :members:
+
+.. autoclass:: deepchem.models.losses.GraphNodeMaskingLoss
+  :members:
+
+.. autoclass:: deepchem.models.losses.GraphEdgeMaskingLoss
+  :members:
+
 Optimizers
 ----------
 
@@ -395,13 +413,23 @@ Note that this is an alternative implementation for MPNN and currently you can o
 
 InfoGraphModel
 --------------
+
 .. autoclass:: deepchem.models.torch_models.InfoGraphModel
   :members:
 
-InfoGraphEncoder
-----------------
-.. autoclass:: deepchem.models.torch_models.InfoGraphEncoder
+InfoGraphStarModel
+------------------
+
+.. autoclass:: deepchem.models.torch_models.InfoGraphStarModel
   :members:
+
+
+GNNModular
+----------
+
+.. autoclass:: deepchem.models.torch_models.gnn.GNNModular
+  :members:
+
 
 LCNNModel
 ---------
@@ -432,6 +460,11 @@ DMPNNModel
 .. autoclass:: deepchem.models.torch_models.DMPNNModel
   :members:
 
+GroverModel
+-----------
+
+.. autoclass:: deepchem.models.torch_models.GroverModel
+  :members:
 
 PyTorch Lightning Models
 ==============

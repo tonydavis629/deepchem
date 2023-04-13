@@ -1,6 +1,6 @@
 import math
 import numpy as np
-from typing import Any, Tuple, Optional, Sequence, List, Union
+from typing import Any, Tuple, Optional, Sequence, List, Union, Callable
 from collections.abc import Sequence as SequenceCollection
 try:
     import torch
@@ -11,7 +11,7 @@ except ModuleNotFoundError:
     raise ImportError('These classes require PyTorch to be installed.')
 
 try:
-    from torch_scatter import scatter_mean
+    from torch_geometric.utils import scatter
 except ModuleNotFoundError:
     pass
 
@@ -37,7 +37,7 @@ class MultilayerPerceptron(nn.Module):
                  d_output: int,
                  d_hidden: Optional[tuple] = None,
                  dropout: float = 0.0,
-                 activation_fn: ActivationFn = 'relu',
+                 activation_fn: Union[Callable, str] = 'relu',
                  skip_connection: bool = False):
         """Initialize the model.
 
@@ -66,6 +66,10 @@ class MultilayerPerceptron(nn.Module):
         self.skip = nn.Linear(d_input, d_output) if skip_connection else None
 
     def build_layers(self):
+        """
+        Build the layers of the model, iterating through the hidden dimensions to produce a list of layers.
+        """
+
         layer_list = []
         layer_dim = self.d_input
         if self.d_hidden is not None:
@@ -82,7 +86,9 @@ class MultilayerPerceptron(nn.Module):
         for layer in self.model:
             x = layer(x)
             if isinstance(layer, nn.Linear):
-                x = self.activation_fn(x)
+                x = self.activation_fn(
+                    x
+                )  # Done because activation_fn returns a torch.nn.functional
         if self.skip is not None:
             return x + self.skip(input)
         else:
@@ -713,14 +719,10 @@ class MATEncoderLayer(nn.Module):
 
 
 class SublayerConnection(nn.Module):
-    """SublayerConnection layer which establishes a residual connection, as used in the Molecular Attention Transformer [1]_.
+    """SublayerConnection layer based on the paper `Attention Is All You Need <https://arxiv.org/abs/1706.03762>`_.
 
-    The SublayerConnection layer is a residual layer which is then passed through Layer Normalization.
-    The residual connection is established by computing the dropout-adjusted layer output of a normalized tensor and adding this to the original input tensor.
-
-    References
-    ----------
-    .. [1] Lukasz Maziarka et al. "Molecule Attention Transformer" Graph Representation Learning workshop and Machine Learning and the Physical Sciences workshop at NeurIPS 2019. 2020. https://arxiv.org/abs/2002.08264
+    The SublayerConnection normalizes and adds dropout to output tensor of an arbitary layer.
+    It further adds a residual layer connection between the input of the arbitary layer and the dropout-adjusted layer output.
 
     Examples
     --------
@@ -759,7 +761,7 @@ class SublayerConnection(nn.Module):
             Layer whose normalized output will be added to x.
         """
         if x is None:
-            return self.dropout(self.norm(output))
+            return self.dropout_p(self.norm(output))
         return x + self.dropout_p(self.norm(output))
 
 
@@ -1136,9 +1138,10 @@ class GraphNetwork(torch.nn.Module):
         # Compute mean edge features for each node by dst_index (each node
         # receives information from edges which have that node as its destination,
         # hence the computation uses dst_index to aggregate information)
-        edge_features_mean_by_node = scatter_mean(edge_features,
-                                                  dst_index,
-                                                  dim=0)
+        edge_features_mean_by_node = scatter(src=edge_features,
+                                             index=dst_index,
+                                             dim=0,
+                                             reduce='mean')
         out = torch.cat(
             (node_features, edge_features_mean_by_node, global_features[batch]),
             dim=1)
@@ -1149,8 +1152,14 @@ class GraphNetwork(torch.nn.Module):
     def _update_global_features(self, node_features, edge_features,
                                 global_features, node_batch_map,
                                 edge_batch_map):
-        edge_features_mean = scatter_mean(edge_features, edge_batch_map, dim=0)
-        node_features_mean = scatter_mean(node_features, node_batch_map, dim=0)
+        edge_features_mean = scatter(src=edge_features,
+                                     index=edge_batch_map,
+                                     dim=0,
+                                     reduce='mean')
+        node_features_mean = scatter(src=node_features,
+                                     index=node_batch_map,
+                                     dim=0,
+                                     reduce='mean')
         out = torch.cat(
             (edge_features_mean, node_features_mean, global_features), dim=1)
         for model in self.global_models:
