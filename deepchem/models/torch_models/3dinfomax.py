@@ -105,9 +105,9 @@ class AtomEncoder(torch.nn.Module):
         x_embedding = 0
         for i in range(x.shape[1]):
             if self.padding:
-                x_embedding += self.atom_embedding_list[i](x[:, i] + 1)
+                x_embedding += self.atom_embedding_list[i](x[:, i].long() + 1)
             else:
-                x_embedding += self.atom_embedding_list[i](x[:, i])
+                x_embedding += self.atom_embedding_list[i](x[:, i].long())
 
         return x_embedding
 
@@ -136,16 +136,34 @@ class BondEncoder(torch.nn.Module):
         bond_embedding = 0
         for i in range(edge_attr.shape[1]):
             if self.padding:
-                bond_embedding += self.bond_embedding_list[i](edge_attr[:, i] +
-                                                              1)
+                bond_embedding += self.bond_embedding_list[i](
+                    edge_attr[:, i].long() + 1)
             else:
-                bond_embedding += self.bond_embedding_list[i](edge_attr[:, i])
+                bond_embedding += self.bond_embedding_list[i](
+                    edge_attr[:, i].long())
 
         return bond_embedding
 
 
 # networks
 
+
+SUPPORTED_ACTIVATION_MAP = {'ReLU', 'Sigmoid', 'Tanh', 'ELU', 'SELU', 'GLU', 'LeakyReLU', 'Softplus', 'SiLU', 'None'}
+EPS = 1e-5
+
+
+def get_activation(activation):
+    """ returns the activation function represented by the input string """
+    if activation and callable(activation):
+        # activation is already a function
+        return activation
+    # search in SUPPORTED_ACTIVATION_MAP a torch.nn.modules.activation
+    activation = [x for x in SUPPORTED_ACTIVATION_MAP if activation.lower() == x.lower()]
+    assert len(activation) == 1 and isinstance(activation[0], str), 'Unhandled activation function'
+    activation = activation[0]
+    if activation.lower() == 'none':
+        return None
+    return vars(torch.nn.modules.activation)[activation]()
 
 class FCLayer(nn.Module):
     r"""
@@ -220,7 +238,7 @@ class FCLayer(nn.Module):
         if batch_norm:
             self.batch_norm = nn.BatchNorm1d(
                 out_dim, momentum=batch_norm_momentum).to(device)
-        self.activation = torch.nn.ReLU
+        self.activation = get_activation(activation)
         self.init_fn = nn.init.xavier_uniform_
 
         self.reset_parameters()
@@ -801,16 +819,6 @@ class PNALayer(nn.Module):
         return {"e": self.pretrans(z2)}
 
 
-def SSL_train_step(self, model2d, model3d, batch):
-    info2d, info3d, *snorm_n = tuple(batch)
-    view2d = model2d(*info2d,
-                     *snorm_n)  # foward the rest of the batch to the model
-    view3d = model3d(*info3d)
-    loss = torch.nn.MSELoss(view2d,
-                            view3d,
-                            nodes_per_graph=info2d[0].batch_num_nodes()
-                            if isinstance(info2d[0], dgl.DGLGraph) else None)
-    return loss, view2d, view3d
 
 
 def safe_index(l, e):
@@ -871,33 +879,10 @@ def bond_to_feature_vector(bond):
 # class Rdkitfeaturizer(MolecularFeaturizer):
 
 
-def process(ids, data, targets):
-    # print('processing data from ({}) and saving it to ({})'.format(self.qm9_directory,
-    #                                                                os.path.join(self.qm9_directory,
-    # 'processed_rdkit_conformers_120k')))
-    # load qm9 data with spatial coordinates
-    # data_qm9 = dict(np.load(os.path.join(self.qm9_directory, self.raw_spatial_data), allow_pickle=True))
-    # # Read the QM9 data with SMILES information
-    # molecules_df = pd.read_csv(os.path.join(self.qm9_directory, self.raw_qm9_file))
-
-    atom_slices = [0]
-    edge_slices = [0]
-    mol_id = []
-    n_atoms_list = []
-    # all_atom_features = []
-    all_edge_features = []
-    # coordinates = []
-    edge_indices = []  # edges of each molecule in coo format
+def featurize(data):
     graphs = []
-    # targets = [
-    # ]  # the 19 properties that should be predicted for the QM9 dataset
-    total_atoms = 0
-    total_edges = 0
-    avg_degree = 0  # average degree in the dataset
-    # go through all molecules in the npz file
+    for smiles in data:
 
-    for mol_idx, smiles in enumerate(data):
-        # get the molecule using the smiles representation from the csv file
         mol = Chem.MolFromSmiles(smiles)
         # add hydrogen bonds to molecule because they are not in the smiles representation
         mol = Chem.AddHs(mol)
@@ -918,8 +903,6 @@ def process(ids, data, targets):
         for atom in mol.GetAtoms():
             atom_features_list.append(atom_to_feature_vector(atom))
 
-        n_atoms = len(atom_features_list)
-
         edges_list = []
         edge_features_list = []
         for bond in mol.GetBonds():
@@ -936,18 +919,6 @@ def process(ids, data, targets):
         edge_index = torch.tensor(edges_list, dtype=torch.long).T
         edge_features = torch.tensor(edge_features_list, dtype=torch.long)
 
-        avg_degree += (len(edges_list) / 2) / n_atoms
-
-
-        edge_indices.append(edge_index)
-        all_edge_features.append(edge_features)
-
-        total_edges += len(edges_list)
-        total_atoms += n_atoms
-        edge_slices.append(total_edges)
-        atom_slices.append(total_atoms)
-        mol_id.append(ids[mol_idx])
-        n_atoms_list.append(n_atoms)
         graph = GraphData(node_pos_features=np.array(coordinates),
                           node_features=np.array(atom_features_list),
                           edge_features=np.array(edge_features),
@@ -968,7 +939,18 @@ model3d = Net3D(node_dim=75,
                 target_dim=1,
                 readout_aggregators=["sum"])
 
-# preprocessed data comes in processed_rdkit_confromers_120k in QM9datasetRDKITConformers. self.raw_spatial_data = 'qm9_eV.npz'
+
+def SSL_train_step(model2d, model3d, info2d, info3d):
+    # info2d, info3d, *snorm_n = tuple(batch)
+    view2d = model2d(*info2d,
+                     *snorm_n)  # foward the rest of the batch to the model
+    view3d = model3d(*info3d)
+    loss = torch.nn.MSELoss(view2d,
+                            view3d,
+                            nodes_per_graph=info2d[0].batch_num_nodes()
+                            if isinstance(info2d[0], dgl.DGLGraph) else None)
+    return loss, view2d, view3d
+
 
 example_data = pd.read_csv(
     '/home/tony/github/deepchem/deepchem/models/tests/assets/example_regression.csv'
@@ -979,6 +961,13 @@ ids = example_data['Compound ID'].tolist()
 datapoints = example_data['smiles'].tolist()
 targets = example_data['outcome'].tolist()
 
-graphs = process(ids, datapoints, targets)
+graphs = featurize(datapoints)
 
+total_loss = 0
+for graph in graphs:
+    view2d = model2d(graph.to_dgl_graph())
+    view3d = model3d(graph.to_dgl_graph())
+    loss = torch.nn.MSELoss(view2d, view3d)
+    total_loss += loss
 
+print(total_loss)

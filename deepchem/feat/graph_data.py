@@ -190,13 +190,14 @@ class GraphData:
         g = dgl.graph(
             (torch.from_numpy(src).long(), torch.from_numpy(dst).long()),
             num_nodes=self.num_nodes)
-        g.ndata['x'] = torch.from_numpy(self.node_features).float()
-
+        g.ndata['feat'] = torch.from_numpy(self.node_features).float()
+        # x
         if self.node_pos_features is not None:
             g.ndata['pos'] = torch.from_numpy(self.node_pos_features).float()
 
         if self.edge_features is not None:
-            g.edata['edge_attr'] = torch.from_numpy(self.edge_features).float()
+            g.edata['feat'] = torch.from_numpy(self.edge_features).float()
+            # 'edge_attr'
 
         if self_loop:
             # This assumes that the edge features for self loops are full-zero tensors
