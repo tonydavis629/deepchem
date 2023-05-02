@@ -11,7 +11,8 @@ from typing import Dict, List, Union, Callable
 import numpy as np
 from functools import partial
 from math import sqrt
-
+from deepchem.feat.graph_data import GraphData
+from deepchem.feat import MolecularFeaturizer
 # featurization
 
 allowable_features = {
@@ -58,11 +59,12 @@ full_atom_feature_dims = list(
         allowable_features['possible_is_in_ring_list']
     ]))
 
-full_bond_feature_dims = list(map(len, [
+full_bond_feature_dims = list(
+    map(len, [
         allowable_features['possible_bond_type_list'],
         allowable_features['possible_bond_stereo_list'],
         allowable_features['possible_is_conjugated_list']
-        ]))
+    ]))
 
 
 def fourier_encode_dist(x, num_encodings=4, include_self=True):
@@ -134,7 +136,8 @@ class BondEncoder(torch.nn.Module):
         bond_embedding = 0
         for i in range(edge_attr.shape[1]):
             if self.padding:
-                bond_embedding += self.bond_embedding_list[i](edge_attr[:, i] + 1)
+                bond_embedding += self.bond_embedding_list[i](edge_attr[:, i] +
+                                                              1)
             else:
                 bond_embedding += self.bond_embedding_list[i](edge_attr[:, i])
 
@@ -142,6 +145,7 @@ class BondEncoder(torch.nn.Module):
 
 
 # networks
+
 
 class FCLayer(nn.Module):
     r"""
@@ -799,7 +803,8 @@ class PNALayer(nn.Module):
 
 def SSL_train_step(self, model2d, model3d, batch):
     info2d, info3d, *snorm_n = tuple(batch)
-    view2d = model2d(*info2d, *snorm_n)  # foward the rest of the batch to the model
+    view2d = model2d(*info2d,
+                     *snorm_n)  # foward the rest of the batch to the model
     view3d = model3d(*info3d)
     loss = torch.nn.MSELoss(view2d,
                             view3d,
@@ -808,10 +813,172 @@ def SSL_train_step(self, model2d, model3d, batch):
     return loss, view2d, view3d
 
 
+def safe_index(l, e):
+    """
+    Return index of element e in list l. If e is not present, return the last index
+    """
+    try:
+        return l.index(e)
+    except:
+        return len(l) - 1
+
+
+def atom_to_feature_vector(atom):
+    """
+    Converts rdkit atom object to feature list of indices
+    :param mol: rdkit atom object
+    :return: list
+    """
+    atom_feature = [
+        safe_index(allowable_features['possible_atomic_num_list'],
+                   atom.GetAtomicNum()),
+        safe_index(allowable_features['possible_chirality_list'],
+                   str(atom.GetChiralTag())),
+        safe_index(allowable_features['possible_degree_list'],
+                   atom.GetTotalDegree()),
+        safe_index(allowable_features['possible_formal_charge_list'],
+                   atom.GetFormalCharge()),
+        safe_index(allowable_features['possible_numH_list'],
+                   atom.GetTotalNumHs()),
+        safe_index(allowable_features['possible_number_radical_e_list'],
+                   atom.GetNumRadicalElectrons()),
+        safe_index(allowable_features['possible_hybridization_list'],
+                   str(atom.GetHybridization())),
+        allowable_features['possible_is_aromatic_list'].index(
+            atom.GetIsAromatic()),
+        allowable_features['possible_is_in_ring_list'].index(atom.IsInRing()),
+    ]
+    return atom_feature
+
+
+def bond_to_feature_vector(bond):
+    """
+    Converts rdkit bond object to feature list of indices
+    :param mol: rdkit bond object
+    :return: list
+    """
+    bond_feature = [
+        safe_index(allowable_features['possible_bond_type_list'],
+                   str(bond.GetBondType())),
+        allowable_features['possible_bond_stereo_list'].index(
+            str(bond.GetStereo())),
+        allowable_features['possible_is_conjugated_list'].index(
+            bond.GetIsConjugated()),
+    ]
+    return bond_feature
+
+
+# class Rdkitfeaturizer(MolecularFeaturizer):
+
+
+def process(ids, data, targets):
+    # print('processing data from ({}) and saving it to ({})'.format(self.qm9_directory,
+    #                                                                os.path.join(self.qm9_directory,
+    # 'processed_rdkit_conformers_120k')))
+    # load qm9 data with spatial coordinates
+    # data_qm9 = dict(np.load(os.path.join(self.qm9_directory, self.raw_spatial_data), allow_pickle=True))
+    # # Read the QM9 data with SMILES information
+    # molecules_df = pd.read_csv(os.path.join(self.qm9_directory, self.raw_qm9_file))
+
+    atom_slices = [0]
+    edge_slices = [0]
+    mol_id = []
+    n_atoms_list = []
+    # all_atom_features = []
+    all_edge_features = []
+    # coordinates = []
+    edge_indices = []  # edges of each molecule in coo format
+    graphs = []
+    # targets = [
+    # ]  # the 19 properties that should be predicted for the QM9 dataset
+    total_atoms = 0
+    total_edges = 0
+    avg_degree = 0  # average degree in the dataset
+    # go through all molecules in the npz file
+
+    for mol_idx, smiles in enumerate(data):
+        # get the molecule using the smiles representation from the csv file
+        mol = Chem.MolFromSmiles(smiles)
+        # add hydrogen bonds to molecule because they are not in the smiles representation
+        mol = Chem.AddHs(mol)
+
+        try:
+            ps = AllChem.ETKDGv2()
+            ps.useRandomCoords = True
+            AllChem.EmbedMolecule(mol, ps)
+            AllChem.MMFFOptimizeMolecule(mol, confId=0)
+            conf = mol.GetConformer()
+            coordinates = conf.GetPositions()
+        except Exception as e:
+            print(e)
+            print(smiles)
+            continue
+
+        atom_features_list = []
+        for atom in mol.GetAtoms():
+            atom_features_list.append(atom_to_feature_vector(atom))
+
+        n_atoms = len(atom_features_list)
+
+        edges_list = []
+        edge_features_list = []
+        for bond in mol.GetBonds():
+            i = bond.GetBeginAtomIdx()
+            j = bond.GetEndAtomIdx()
+            edge_feature = bond_to_feature_vector(bond)
+
+            # add edges in both directions
+            edges_list.append((i, j))
+            edge_features_list.append(edge_feature)
+            edges_list.append((j, i))
+            edge_features_list.append(edge_feature)
+        # Graph connectivity in COO format with shape [2, num_edges]
+        edge_index = torch.tensor(edges_list, dtype=torch.long).T
+        edge_features = torch.tensor(edge_features_list, dtype=torch.long)
+
+        avg_degree += (len(edges_list) / 2) / n_atoms
+
+
+        edge_indices.append(edge_index)
+        all_edge_features.append(edge_features)
+
+        total_edges += len(edges_list)
+        total_atoms += n_atoms
+        edge_slices.append(total_edges)
+        atom_slices.append(total_atoms)
+        mol_id.append(ids[mol_idx])
+        n_atoms_list.append(n_atoms)
+        graph = GraphData(node_pos_features=np.array(coordinates),
+                          node_features=np.array(atom_features_list),
+                          edge_features=np.array(edge_features),
+                          edge_index=np.array(edge_index))
+        graphs.append(graph)
+    return graphs
+
+
+model2d = PNA(in_dim=75,
+              target_dim=1,
+              hidden_dim=64,
+              aggregators=['sum', 'mean', 'max'],
+              scalers=["identity"],
+              readout_aggregators="sum")
+model3d = Net3D(node_dim=75,
+                edge_dim=12,
+                hidden_dim=64,
+                target_dim=1,
+                readout_aggregators=["sum"])
+
+# preprocessed data comes in processed_rdkit_confromers_120k in QM9datasetRDKITConformers. self.raw_spatial_data = 'qm9_eV.npz'
+
 example_data = pd.read_csv(
     '/home/tony/github/deepchem/deepchem/models/tests/assets/example_regression.csv'
 )
 
-model2d = PNA(in_dim=75, target_dim=1, hidden_dim=64, aggregators=['sum', 'mean', 'max'], scalers=["identity"], readout_aggregators="sum")
-model3d = Net3D(node_dim=75, edge_dim=12, hidden_dim=64, target_dim=1, readout_aggregators=["sum"])
+# return list of SMILES strings
+ids = example_data['Compound ID'].tolist()
+datapoints = example_data['smiles'].tolist()
+targets = example_data['outcome'].tolist()
+
+graphs = process(ids, datapoints, targets)
+
 
