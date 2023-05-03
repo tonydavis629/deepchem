@@ -925,6 +925,40 @@ def featurize(data):
         graphs.append(graph)
     return graphs
 
+# def get_graph(self, idx, e_start, e_end, n_atoms, start):
+#     if idx in self.dgl_graphs:
+#         return self.dgl_graphs[idx].to(self.device)
+#     else:
+#         edge_indices = self.edge_indices[:, e_start:e_end]
+#         g = dgl.graph((edge_indices[0], edge_indices[1]),
+#                         num_nodes=n_atoms,
+#                         device=self.device)
+#         g.ndata['feat'] = self.features_tensor[start:start + n_atoms].to(
+#             self.device)
+#         g.ndata['x'] = self.coordinates[start:start + n_atoms].to(
+#             self.device)
+#         g.edata['feat'] = self.e_features_tensor[e_start:e_end].to(
+#             self.device)
+#         self.dgl_graphs[idx] = g.to('cpu')
+#         return g
+
+# def get_complete_graph(self, idx, n_atoms, start):
+#     if idx in self.complete_graphs:
+#         return self.complete_graphs[idx].to(self.device)
+#     else:
+#         src, dst = self.get_pairwise(n_atoms)
+#         g = dgl.graph((src, dst), device=self.device)
+#         g.ndata['feat'] = self.features_tensor[start:start + n_atoms].to(
+#             self.device)
+#         g.ndata['x'] = self.coordinates[start:start + n_atoms].to(
+#             self.device)
+#         g.edata['d'] = torch.norm(g.ndata['x'][g.edges()[0]] -
+#                                     g.ndata['x'][g.edges()[1]],
+#                                     p=2,
+#                                     dim=-1).unsqueeze(-1).detach()
+#         self.complete_graphs[idx] = g.to('cpu')
+#         return g
+
 
 model2d = PNA(in_dim=75,
               target_dim=5,
