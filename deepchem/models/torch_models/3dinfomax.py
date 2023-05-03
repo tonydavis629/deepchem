@@ -165,6 +165,7 @@ def get_activation(activation):
         return None
     return vars(torch.nn.modules.activation)[activation]()
 
+
 class FCLayer(nn.Module):
     r"""
     A simple fully connected and customizable layer. This layer is centered around a torch.nn.Linear module.
@@ -256,11 +257,11 @@ class FCLayer(nn.Module):
             h = self.activation(h)
         if self.dropout is not None:
             h = self.dropout(h)
-        if self.batch_norm is not None:
-            if h.shape[1] != self.out_dim:
-                h = self.batch_norm(h.transpose(1, 2)).transpose(1, 2)
-            else:
-                h = self.batch_norm(h)
+        # if self.batch_norm is not None:
+        #     if h.shape[1] != self.out_dim:
+        #         h = self.batch_norm(h.transpose(1, 2)).transpose(1, 2)
+        #     else:
+        #         h = self.batch_norm(h)
         return h
 
 
@@ -355,7 +356,7 @@ class Net3D(nn.Module):
                  **kwargs):
         super(Net3D, self).__init__()
         self.fourier_encodings = fourier_encodings
-        edge_in_dim = 1 if fourier_encodings == 0 else 2 * fourier_encodings + 1
+        edge_in_dim = 3 if fourier_encodings == 0 else 2 * fourier_encodings + 1  # originally 1
         self.edge_input = MLP(
             in_dim=edge_in_dim,
             hidden_size=hidden_dim,
@@ -443,7 +444,7 @@ class Net3D(nn.Module):
         return {'feat': self.node_wise_output_network(nodes.data['feat'])}
 
     def input_edge_func(self, edges):
-        return {'d': F.silu(self.edge_input(edges.data['d']))}
+        return {'d': F.silu(self.edge_input(edges.data['feat']))} # 'originally 'd'
 
 
 class Net3DLayer(nn.Module):
@@ -819,8 +820,6 @@ class PNALayer(nn.Module):
         return {"e": self.pretrans(z2)}
 
 
-
-
 def safe_index(l, e):
     """
     Return index of element e in list l. If e is not present, return the last index
@@ -928,28 +927,28 @@ def featurize(data):
 
 
 model2d = PNA(in_dim=75,
-              target_dim=1,
+              target_dim=5,
               hidden_dim=64,
               aggregators=['sum', 'mean', 'max'],
               scalers=["identity"],
-              readout_aggregators="sum")
+              readout_aggregators=["sum"])
 model3d = Net3D(node_dim=75,
                 edge_dim=12,
                 hidden_dim=64,
-                target_dim=1,
+                target_dim=5,
                 readout_aggregators=["sum"])
 
 
-def SSL_train_step(model2d, model3d, info2d, info3d):
-    # info2d, info3d, *snorm_n = tuple(batch)
-    view2d = model2d(*info2d,
-                     *snorm_n)  # foward the rest of the batch to the model
-    view3d = model3d(*info3d)
-    loss = torch.nn.MSELoss(view2d,
-                            view3d,
-                            nodes_per_graph=info2d[0].batch_num_nodes()
-                            if isinstance(info2d[0], dgl.DGLGraph) else None)
-    return loss, view2d, view3d
+# def SSL_train_step(model2d, model3d, info2d, info3d):
+#     # info2d, info3d, *snorm_n = tuple(batch)
+#     view2d = model2d(*info2d,
+#                      *snorm_n)  # foward the rest of the batch to the model
+#     view3d = model3d(*info3d)
+#     loss = torch.nn.MSELoss(view2d,
+#                             view3d,
+#                             nodes_per_graph=info2d[0].batch_num_nodes()
+#                             if isinstance(info2d[0], dgl.DGLGraph) else None)
+#     return loss, view2d, view3d
 
 
 example_data = pd.read_csv(
@@ -962,12 +961,12 @@ datapoints = example_data['smiles'].tolist()
 targets = example_data['outcome'].tolist()
 
 graphs = featurize(datapoints)
-
+criterion = torch.nn.MSELoss()
 total_loss = 0
 for graph in graphs:
     view2d = model2d(graph.to_dgl_graph())
     view3d = model3d(graph.to_dgl_graph())
-    loss = torch.nn.MSELoss(view2d, view3d)
+    loss = criterion(view2d, view3d)
     total_loss += loss
 
 print(total_loss)
