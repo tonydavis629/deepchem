@@ -383,7 +383,7 @@ class Net3D(nn.Module):
 
     def input_edge_func(self, edges):
         return {
-            'd': F.silu(self.edge_input(edges.data['feat']))
+            'd': F.silu(self.edge_input(edges.data['edge_attr']))
         }  # 'originally 'd'
 
 
@@ -633,8 +633,8 @@ class PNAGNN(nn.Module):
         self.bond_encoder = BondEncoder(emb_dim=hidden_dim)
 
     def forward(self, graph: dgl.DGLGraph):
-        graph.ndata['feat'] = self.atom_encoder(graph.ndata['feat'])
-        graph.edata['feat'] = self.bond_encoder(graph.edata['feat'])
+        graph.ndata['feat'] = self.atom_encoder(graph.ndata['x'])
+        graph.edata['feat'] = self.bond_encoder(graph.edata['edge_attr'])
 
         for mp_layer in self.mp_layers:
             mp_layer(graph)
