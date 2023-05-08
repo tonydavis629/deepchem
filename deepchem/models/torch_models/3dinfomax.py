@@ -1,9 +1,8 @@
 import torch
 from torch import nn
-from deepchem.feat.molecule_featurizers.conformer_featurizer import full_atom_feature_dims, full_bond_feature_dims, fourier_encode_dist
+from deepchem.feat.molecule_featurizers.conformer_featurizer import full_atom_feature_dims, full_bond_feature_dims
 from math import sqrt
 import dgl
-import torch.nn as nn
 import torch.nn.functional as F
 import dgl.function as fn
 from typing import Dict, List, Union, Callable
@@ -528,7 +527,7 @@ PNA_SCALERS = {
 class PNA(nn.Module):
     """
     Message Passing Neural Network that does not use 3D information
-    
+
     PNA: Principal Neighbourhood Aggregation 
         Gabriele Corso, Luca Cavalleri, Dominique Beaini, Pietro Lio, Petar Velickovic
         https://arxiv.org/abs/2004.05718
@@ -763,3 +762,13 @@ class PNALayer(nn.Module):
         else:
             z2 = torch.cat([edges.src['feat'], edges.dst['feat']], dim=-1)
         return {"e": self.pretrans(z2)}
+
+
+def fourier_encode_dist(x, num_encodings=4, include_self=True):
+    x = x.unsqueeze(-1)
+    device, dtype, orig_x = x.device, x.dtype, x
+    scales = 2**torch.arange(num_encodings, device=device, dtype=dtype)
+    x = x / scales
+    x = torch.cat([x.sin(), x.cos()], dim=-1)
+    x = torch.cat((x, orig_x), dim=-1) if include_self else x
+    return x.squeeze()
