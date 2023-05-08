@@ -3,8 +3,13 @@ from torch import nn
 from deepchem.feat.molecule_featurizers.conformer_featurizer import full_atom_feature_dims, full_bond_feature_dims, fourier_encode_dist
 from math import sqrt
 import dgl
+import torch.nn as nn
+import torch.nn.functional as F
+import dgl.function as fn
+from typing import Dict, List, Union, Callable
+import numpy as np
+from functools import partial
 
-from typing import List, Union, Callable, Dict
 
 class AtomEncoder(torch.nn.Module):
 
@@ -758,5 +763,3 @@ class PNALayer(nn.Module):
         else:
             z2 = torch.cat([edges.src['feat'], edges.dst['feat']], dim=-1)
         return {"e": self.pretrans(z2)}
-
-
