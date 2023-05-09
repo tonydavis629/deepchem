@@ -1,6 +1,7 @@
 import torch
 from torch import nn
 from deepchem.feat.molecule_featurizers.conformer_featurizer import full_atom_feature_dims, full_bond_feature_dims
+from deepchem.models.torch_models.layers import MultilayerPerceptron
 from math import sqrt
 import dgl
 import torch.nn.functional as F
@@ -80,200 +81,11 @@ class BondEncoder(torch.nn.Module):
 
 # networks
 
-SUPPORTED_ACTIVATION_MAP = {
-    'ReLU', 'Sigmoid', 'Tanh', 'ELU', 'SELU', 'GLU', 'LeakyReLU', 'Softplus',
-    'SiLU', 'None'
-}
-EPS = 1e-5
-
-
-def get_activation(activation):
-    """ returns the activation function represented by the input string """
-    if activation and callable(activation):
-        # activation is already a function
-        return activation
-    # search in SUPPORTED_ACTIVATION_MAP a torch.nn.modules.activation
-    activation = [
-        x for x in SUPPORTED_ACTIVATION_MAP if activation.lower() == x.lower()
-    ]
-    assert len(activation) == 1 and isinstance(
-        activation[0], str), 'Unhandled activation function'
-    activation = activation[0]
-    if activation.lower() == 'none':
-        return None
-    return vars(torch.nn.modules.activation)[activation]()
-
-
-class FCLayer(nn.Module):
-    r"""
-    A simple fully connected and customizable layer. This layer is centered around a torch.nn.Linear module.
-    The order in which transformations are applied is:
-    #. Dense Layer
-    #. Activation
-    #. Dropout (if applicable)
-    #. Batch Normalization (if applicable)
-    Arguments
-    ----------
-        in_dim: int
-            Input dimension of the layer (the torch.nn.Linear)
-        out_dim: int
-            Output dimension of the layer.
-        dropout: float, optional
-            The ratio of units to dropout. No dropout by default.
-            (Default value = 0.)
-        activation: str or callable, optional
-            Activation function to use.
-            (Default value = relu)
-        batch_norm: bool, optional
-            Whether to use batch normalization
-            (Default value = False)
-        bias: bool, optional
-            Whether to enable bias in for the linear layer.
-            (Default value = True)
-        init_fn: callable, optional
-            Initialization function to use for the weight of the layer. Default is
-            :math:`\mathcal{U}(-\sqrt{k}, \sqrt{k})` with :math:`k=\frac{1}{ \text{in_dim}}`
-            (Default value = None)
-    Attributes
-    ----------
-        dropout: int
-            The ratio of units to dropout.
-        batch_norm: int
-            Whether to use batch normalization
-        linear: torch.nn.Linear
-            The linear layer
-        activation: the torch.nn.Module
-            The activation layer
-        init_fn: function
-            Initialization function used for the weight of the layer
-        in_dim: int
-            Input dimension of the linear layer
-        out_dim: int
-            Output dimension of the linear layer
-    """
-
-    def __init__(self,
-                 in_dim,
-                 out_dim,
-                 activation='relu',
-                 dropout=0.,
-                 batch_norm=False,
-                 batch_norm_momentum=0.1,
-                 bias=True,
-                 init_fn=None,
-                 device='cpu'):
-        super(FCLayer, self).__init__()
-        self.__params = locals()
-        del self.__params['__class__']
-        del self.__params['self']
-        self.in_dim = in_dim
-        self.out_dim = out_dim
-        self.bias = bias
-        self.linear = nn.Linear(in_dim, out_dim, bias=bias).to(device)
-        self.dropout = None
-        self.batch_norm = None
-        if dropout:
-            self.dropout = nn.Dropout(p=dropout)
-        if batch_norm:
-            self.batch_norm = nn.BatchNorm1d(
-                out_dim, momentum=batch_norm_momentum).to(device)
-        self.activation = get_activation(activation)
-        self.init_fn = nn.init.xavier_uniform_
-
-        self.reset_parameters()
-
-    def reset_parameters(self, init_fn=None):
-        init_fn = init_fn or self.init_fn
-        if init_fn is not None:
-            init_fn(self.linear.weight, 1 / self.in_dim)
-        if self.bias:
-            self.linear.bias.data.zero_()
-
-    def forward(self, x):
-        h = self.linear(x)
-        if self.activation is not None:
-            h = self.activation(h)
-        if self.dropout is not None:
-            h = self.dropout(h)
-        # if self.batch_norm is not None:
-        #     if h.shape[1] != self.out_dim:
-        #         h = self.batch_norm(h.transpose(1, 2)).transpose(1, 2)
-        #     else:
-        #         h = self.batch_norm(h)
-        return h
-
-
-class MLP(nn.Module):
-    """
-        Simple multi-layer perceptron, built of a series of FCLayers
-    """
-
-    def __init__(self,
-                 in_dim,
-                 out_dim,
-                 layers,
-                 hidden_size=None,
-                 mid_activation='relu',
-                 last_activation='none',
-                 dropout=0.,
-                 mid_batch_norm=False,
-                 last_batch_norm=False,
-                 batch_norm_momentum=0.1,
-                 device='cpu'):
-        super(MLP, self).__init__()
-
-        self.in_dim = in_dim
-        self.hidden_size = hidden_size
-        self.out_dim = out_dim
-
-        self.fully_connected = nn.ModuleList()
-        if layers <= 1:
-            self.fully_connected.append(
-                FCLayer(in_dim,
-                        out_dim,
-                        activation=last_activation,
-                        batch_norm=last_batch_norm,
-                        device=device,
-                        dropout=dropout,
-                        batch_norm_momentum=batch_norm_momentum))
-        else:
-            self.fully_connected.append(
-                FCLayer(in_dim,
-                        hidden_size,
-                        activation=mid_activation,
-                        batch_norm=mid_batch_norm,
-                        device=device,
-                        dropout=dropout,
-                        batch_norm_momentum=batch_norm_momentum))
-            for _ in range(layers - 2):
-                self.fully_connected.append(
-                    FCLayer(hidden_size,
-                            hidden_size,
-                            activation=mid_activation,
-                            batch_norm=mid_batch_norm,
-                            device=device,
-                            dropout=dropout,
-                            batch_norm_momentum=batch_norm_momentum))
-            self.fully_connected.append(
-                FCLayer(hidden_size,
-                        out_dim,
-                        activation=last_activation,
-                        batch_norm=last_batch_norm,
-                        device=device,
-                        dropout=dropout,
-                        batch_norm_momentum=batch_norm_momentum))
-
-    def forward(self, x):
-        for fc in self.fully_connected:
-            x = fc(x)
-        return x
-
-
 class Net3D(nn.Module):
 
     def __init__(self,
-                 node_dim,
-                 edge_dim,
+                #  node_dim,
+                #  edge_dim,
                  hidden_dim,
                  target_dim,
                  readout_aggregators: List[str],
@@ -294,19 +106,15 @@ class Net3D(nn.Module):
                  **kwargs):
         super(Net3D, self).__init__()
         self.fourier_encodings = fourier_encodings
-        edge_in_dim = 3 if fourier_encodings == 0 else 2 * fourier_encodings + 1  # originally 1
-        self.edge_input = MLP(
-            in_dim=edge_in_dim,
-            hidden_size=hidden_dim,
-            out_dim=hidden_dim,
-            mid_batch_norm=batch_norm,
-            last_batch_norm=batch_norm,
-            batch_norm_momentum=batch_norm_momentum,
-            layers=1,
-            mid_activation=activation,
-            dropout=dropout,
-            last_activation=activation,
-        )
+        edge_in_dim = 3 if fourier_encodings == 0 else 2 * fourier_encodings + 1  # originally 1 XXX
+
+        self.edge_input = nn.Sequential(
+            MultilayerPerceptron(d_input=edge_in_dim,
+                                 d_output=hidden_dim,
+                                 d_hidden=(hidden_dim,),
+                                 batch_norm=True,
+                                 batch_norm_momentum=batch_norm_momentum),
+            torch.nn.SiLU())
 
         self.use_node_features = use_node_features
         if self.use_node_features:
@@ -330,28 +138,25 @@ class Net3D(nn.Module):
 
         self.node_wise_output_layers = node_wise_output_layers
         if self.node_wise_output_layers > 0:
-            self.node_wise_output_network = MLP(
-                in_dim=hidden_dim,
-                hidden_size=hidden_dim,
-                out_dim=hidden_dim,
-                mid_batch_norm=batch_norm,
-                last_batch_norm=batch_norm,
-                batch_norm_momentum=batch_norm_momentum,
-                layers=node_wise_output_layers,
-                mid_activation=activation,
-                dropout=dropout,
-                last_activation='None',
-            )
+            self.node_wise_output_network = MultilayerPerceptron(
+                d_input=hidden_dim,
+                d_output=hidden_dim,
+                d_hidden=(hidden_dim,),
+                batch_norm=True,
+                batch_norm_momentum=batch_norm_momentum)
 
         if readout_hidden_dim is None:
             readout_hidden_dim = hidden_dim
         self.readout_aggregators = readout_aggregators
-        self.output = MLP(in_dim=hidden_dim * len(self.readout_aggregators),
-                          hidden_size=readout_hidden_dim,
-                          mid_batch_norm=readout_batchnorm,
-                          batch_norm_momentum=batch_norm_momentum,
-                          out_dim=target_dim,
-                          layers=readout_layers)
+
+        self.output = MultilayerPerceptron(
+            d_input=hidden_dim * len(self.readout_aggregators),
+            d_output=target_dim,
+            d_hidden=(readout_hidden_dim,) *
+            (readout_layers -
+             1),  # -1 because the input layer is not considered a hidden layer
+            batch_norm=readout_batchnorm,
+            batch_norm_momentum=batch_norm_momentum)
 
     def forward(self, graph: dgl.DGLGraph):
         if self.use_node_features:
@@ -393,18 +198,15 @@ class Net3DLayer(nn.Module):
                  batch_norm_momentum, dropout, mid_activation,
                  message_net_layers, update_net_layers):
         super(Net3DLayer, self).__init__()
-        self.message_network = MLP(
-            in_dim=hidden_dim * 2 + edge_dim,
-            hidden_size=hidden_dim,
-            out_dim=hidden_dim,
-            mid_batch_norm=batch_norm,
-            last_batch_norm=batch_norm,
-            batch_norm_momentum=batch_norm_momentum,
-            layers=message_net_layers,
-            mid_activation=mid_activation,
-            dropout=dropout,
-            last_activation=mid_activation,
-        )
+
+        self.message_network = nn.Sequential(
+            MultilayerPerceptron(d_input=hidden_dim * 2 + edge_dim,
+                                 d_output=hidden_dim,
+                                 d_hidden=(hidden_dim,) *
+                                 (message_net_layers - 1),
+                                 batch_norm=batch_norm,
+                                 batch_norm_momentum=batch_norm_momentum,
+                                 dropout=dropout), torch.nn.SiLU())
         if reduce_func == 'sum':
             self.reduce_func = fn.sum
         elif reduce_func == 'mean':
@@ -412,18 +214,12 @@ class Net3DLayer(nn.Module):
         else:
             raise ValueError('reduce function not supported: ', reduce_func)
 
-        self.update_network = MLP(
-            in_dim=hidden_dim,
-            hidden_size=hidden_dim,
-            out_dim=hidden_dim,
-            mid_batch_norm=batch_norm,
-            last_batch_norm=batch_norm,
-            batch_norm_momentum=batch_norm_momentum,
-            layers=update_net_layers,
-            mid_activation=mid_activation,
-            dropout=dropout,
-            last_activation='None',
-        )
+        self.update_network = MultilayerPerceptron(
+            d_input=hidden_dim,
+            d_hidden=(hidden_dim,) * (update_net_layers - 1),
+            d_output=hidden_dim,
+            batch_norm=True,
+            batch_norm_momentum=batch_norm_momentum)
 
         self.soft_edge_network = nn.Linear(hidden_dim, 1)
 
@@ -572,12 +368,13 @@ class PNA(nn.Module):
         if readout_hidden_dim is None:
             readout_hidden_dim = hidden_dim
         self.readout_aggregators = readout_aggregators
-        self.output = MLP(in_dim=hidden_dim * len(self.readout_aggregators),
-                          hidden_size=readout_hidden_dim,
-                          mid_batch_norm=readout_batchnorm,
-                          out_dim=target_dim,
-                          layers=readout_layers,
-                          batch_norm_momentum=batch_norm_momentum)
+
+        self.output = MultilayerPerceptron(
+            d_input=hidden_dim * len(self.readout_aggregators),
+            d_hidden=(readout_hidden_dim,) * (readout_layers - 1),
+            d_output=target_dim,
+            batch_norm=readout_batchnorm,
+            batch_norm_momentum=batch_norm_momentum)
 
     def forward(self, graph: dgl.DGLGraph):
         self.node_gnn(graph)
@@ -672,29 +469,23 @@ class PNALayer(nn.Module):
         if in_dim != out_dim:
             self.residual = False
 
-        self.pretrans = MLP(in_dim=(2 * in_dim + in_dim_edges +
-                                    1) if self.pairwise_distances else
-                            (2 * in_dim + in_dim_edges),
-                            hidden_size=in_dim,
-                            out_dim=in_dim,
-                            mid_batch_norm=mid_batch_norm,
-                            last_batch_norm=last_batch_norm,
-                            layers=pretrans_layers,
-                            mid_activation=activation,
-                            dropout=dropout,
-                            last_activation=last_activation,
-                            batch_norm_momentum=batch_norm_momentum)
-        self.posttrans = MLP(
-            in_dim=(len(self.aggregators) * len(self.scalers) + 1) * in_dim,
-            hidden_size=out_dim,
-            out_dim=out_dim,
-            layers=posttrans_layers,
-            mid_activation=activation,
-            last_activation=last_activation,
-            dropout=dropout,
-            mid_batch_norm=mid_batch_norm,
-            last_batch_norm=last_batch_norm,
-            batch_norm_momentum=batch_norm_momentum)
+        self.pretrans = MultilayerPerceptron(
+            d_input=(2 * in_dim + in_dim_edges +
+                     1) if self.pairwise_distances else
+            (2 * in_dim + in_dim_edges),
+            d_output=in_dim,
+            d_hidden=(in_dim,) * (pretrans_layers - 1),
+            batch_norm=True,
+            batch_norm_momentum=batch_norm_momentum,
+            dropout=dropout)
+
+        self.posttrans = MultilayerPerceptron(
+            d_input=(len(self.aggregators) * len(self.scalers) + 1) * in_dim,
+            d_hidden=(out_dim,) * (posttrans_layers - 1),
+            d_output=out_dim,
+            batch_norm=True,
+            batch_norm_momentum=batch_norm_momentum,
+            dropout=dropout)
 
     def forward(self, g):
         h = g.ndata['feat']
