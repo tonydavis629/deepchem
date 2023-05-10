@@ -1,7 +1,10 @@
 def test_conformer_featurizer():
-    from deepchem.feat.molecule_featurizers.conformer_featurizer import RDKitConformerFeaturizer
-    from deepchem.feat.graph_data import BatchGraphData
     import numpy as np
+
+    from deepchem.feat.graph_data import BatchGraphData
+    from deepchem.feat.molecule_featurizers.conformer_featurizer import (
+        RDKitConformerFeaturizer,
+    )
     smiles = ["C1=CC=NC=C1", "CC(=O)C", "C"]
     featurizer = RDKitConformerFeaturizer(num_conformers=2)
     features_list = featurizer.featurize(smiles)

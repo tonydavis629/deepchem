@@ -1,23 +1,40 @@
-import torch
-from torch import nn
-from deepchem.feat.molecule_featurizers.conformer_featurizer import full_atom_feature_dims, full_bond_feature_dims
-from deepchem.models.torch_models.layers import MultilayerPerceptron
-from math import sqrt
-import dgl
-import torch.nn.functional as F
-import dgl.function as fn
-from typing import Dict, List, Union, Callable
-import numpy as np
 from functools import partial
+from math import sqrt
+from typing import Callable, Dict, List, Union
+
+import dgl
+import dgl.function as fn
+import numpy as np
+import torch
+import torch.nn.functional as F
+from torch import nn
+
+from deepchem.feat.molecule_featurizers.conformer_featurizer import (
+    full_atom_feature_dims,
+    full_bond_feature_dims,
+)
+from deepchem.models.torch_models.layers import MultilayerPerceptron
 
 
 class AtomEncoder(torch.nn.Module):
+    """
+    Encodes atom features into embeddings.
+
+    Parameters
+    ----------
+    emb_dim : int
+        The dimension that the returned embedding will have.
+    padding : bool, optional (default=False)
+        If true then the last index will be used for padding.
+
+    Examples
+    --------
+    >>> atom_encoder = AtomEncoder(emb_dim=32)
+    >>> atom_features = torch.tensor([[1, 6, 0], [2, 7, 1]])
+    >>> atom_embeddings = atom_encoder(atom_features)
+    """
 
     def __init__(self, emb_dim, padding=False):
-        """
-        :param emb_dim: the dimension that the returned embedding will have
-        :param padding: if this is true then -1 will be mapped to padding
-        """
         super(AtomEncoder, self).__init__()
 
         self.atom_embedding_list = torch.nn.ModuleList()
@@ -47,18 +64,30 @@ class AtomEncoder(torch.nn.Module):
 
 
 class BondEncoder(torch.nn.Module):
+    """
+    Encodes bond features into embeddings.
+
+    Parameters
+    ----------
+    emb_dim : int
+        The dimension that the returned embedding will have.
+    padding : bool, optional (default=False)
+        If true then the last index will be used for padding.
+
+    Examples
+    --------
+    >>> bond_encoder = BondEncoder(emb_dim=32)
+    >>> bond_features = torch.tensor([[1, 0], [2, 1]])
+    >>> bond_embeddings = bond_encoder(bond_features)
+    """
 
     def __init__(self, emb_dim, padding=False):
-        """
-        :param emb_dim: the dimension that the returned embedding will have
-        :param padding: if this is true then -1 will be mapped to padding
-        """
         super(BondEncoder, self).__init__()
 
         self.bond_embedding_list = torch.nn.ModuleList()
         self.padding = padding
 
-        for i, dim in enumerate(full_bond_feature_dims):
+        for dim in full_bond_feature_dims:
             if padding:
                 emb = torch.nn.Embedding(dim + 1, emb_dim, padding_idx=0)
             else:
@@ -79,13 +108,55 @@ class BondEncoder(torch.nn.Module):
         return bond_embedding
 
 
-# networks
-
 class Net3D(nn.Module):
+    """
+    Net3D is a 3D graph neural network that expects a DGL graph input with 3D coordiantes.
+
+    Parameters
+    ----------
+    hidden_dim : int
+        The dimension of the hidden layers.
+    target_dim : int
+        The dimension of the output layer.
+    readout_aggregators : List[str]
+        A list of aggregator functions for the readout layer.
+    batch_norm : bool, optional (default=False)
+        Whether to use batch normalization.
+    node_wise_output_layers : int, optional (default=2)
+        The number of output layers for each node.
+    readout_batchnorm : bool, optional (default=True)
+        Whether to use batch normalization in the readout layer.
+    batch_norm_momentum : float, optional (default=0.1)
+        The momentum for the batch normalization layers.
+    reduce_func : str, optional (default='sum')
+        The reduce function to use for aggregating messages.
+    dropout : float, optional (default=0.0)
+        The dropout rate for the layers.
+    propagation_depth : int, optional (default=4)
+        The number of propagation layers in the network.
+    readout_layers : int, optional (default=2)
+        The number of readout layers in the network.
+    readout_hidden_dim : int, optional (default=None)
+        The dimension of the hidden layers in the readout network.
+    fourier_encodings : int, optional (default=0)
+        The number of Fourier encodings to use.
+    activation : str, optional (default='SiLU')
+        The activation function to use in the network.
+    update_net_layers : int, optional (default=2)
+        The number of update network layers.
+    message_net_layers : int, optional (default=2)
+        The number of message network layers.
+    use_node_features : bool, optional (default=False)
+        Whether to use node features as input.
+
+    Examples
+    --------
+    >>> net3d = Net3D(hidden_dim=32, target_dim=1, readout_aggregators=['mean'])
+    >>> graph = dgl.DGLGraph()
+    >>> output = net3d(graph)
+    """
 
     def __init__(self,
-                #  node_dim,
-                #  edge_dim,
                  hidden_dim,
                  target_dim,
                  readout_aggregators: List[str],
@@ -102,8 +173,7 @@ class Net3D(nn.Module):
                  activation: str = 'SiLU',
                  update_net_layers=2,
                  message_net_layers=2,
-                 use_node_features=False,
-                 **kwargs):
+                 use_node_features=False):
         super(Net3D, self).__init__()
         self.fourier_encodings = fourier_encodings
         edge_in_dim = 3 if fourier_encodings == 0 else 2 * fourier_encodings + 1  # originally 1 XXX
@@ -187,12 +257,40 @@ class Net3D(nn.Module):
         return {'feat': self.node_wise_output_network(nodes.data['feat'])}
 
     def input_edge_func(self, edges):
-        return {
-            'd': F.silu(self.edge_input(edges.data['edge_attr']))
-        }  # 'originally 'd'
+        return {'d': F.silu(self.edge_input(edges.data['edge_attr']))}
 
 
 class Net3DLayer(nn.Module):
+    """
+    Net3DLayer is a single layer of a 3D graph neural network.
+
+    Parameters
+    ----------
+    edge_dim : int
+        The dimension of the edge features.
+    reduce_func : str
+        The reduce function to use for aggregating messages.
+    hidden_dim : int
+        The dimension of the hidden layers.
+    batch_norm : bool, optional (default=False)
+        Whether to use batch normalization.
+    batch_norm_momentum : float, optional (default=0.1)
+        The momentum for the batch normalization layers.
+    dropout : float, optional (default=0.0)
+        The dropout rate for the layers.
+    mid_activation : str, optional (default='SiLU')
+        The activation function to use in the network.
+    message_net_layers : int, optional (default=2)
+        The number of message network layers.
+    update_net_layers : int, optional (default=2)
+        The number of update network layers.
+
+    Examples
+    --------
+    >>> net3d_layer = Net3DLayer(edge_dim=32, reduce_func='sum', hidden_dim=32)
+    >>> graph = dgl.DGLGraph()
+    >>> net3d_layer(graph)
+    """
 
     def __init__(self, edge_dim, reduce_func, hidden_dim, batch_norm,
                  batch_norm_momentum, dropout, mid_activation,
@@ -247,30 +345,112 @@ class Net3DLayer(nn.Module):
 EPS = 1e-5
 
 
-def aggregate_mean(h, **kwargs):
+def aggregate_mean(h):
+    """
+    Compute the mean of the input tensor along the second to last dimension.
+
+    Parameters
+    ----------
+    h : torch.Tensor
+        Input tensor.
+
+    Returns
+    -------
+    torch.Tensor
+        Mean of the input tensor along the second to last dimension.
+    """
     return torch.mean(h, dim=-2)
 
 
-def aggregate_max(h, **kwargs):
+def aggregate_max(h):
+    """
+    Compute the max of the input tensor along the second to last dimension.
+
+    Parameters
+    ----------
+    h : torch.Tensor
+        Input tensor.
+
+    Returns
+    -------
+    torch.Tensor
+        Max of the input tensor along the second to last dimension.
+    """
     return torch.max(h, dim=-2)[0]
 
 
-def aggregate_min(h, **kwargs):
+def aggregate_min(h):
+    """
+    Compute the min of the input tensor along the second to last dimension.
+
+    Parameters
+    ----------
+    h : torch.Tensor
+        Input tensor.
+    **kwargs
+        Additional keyword arguments.
+
+    Returns
+    -------
+    torch.Tensor
+        Min of the input tensor along the second to last dimension.
+    """
     return torch.min(h, dim=-2)[0]
 
 
-def aggregate_std(h, **kwargs):
+def aggregate_std(h):
+    """
+    Compute the standard deviation of the input tensor along the second to last dimension.
+
+    Parameters
+    ----------
+    h : torch.Tensor
+        Input tensor.
+
+    Returns
+    -------
+    torch.Tensor
+        Standard deviation of the input tensor along the second to last dimension.
+    """
     return torch.sqrt(aggregate_var(h) + EPS)
 
 
-def aggregate_var(h, **kwargs):
+def aggregate_var(h):
+    """
+    Compute the variance of the input tensor along the second to last dimension.
+
+    Parameters
+    ----------
+    h : torch.Tensor
+        Input tensor.
+
+    Returns
+    -------
+    torch.Tensor
+        Variance of the input tensor along the second to last dimension.
+    """
     h_mean_squares = torch.mean(h * h, dim=-2)
     h_mean = torch.mean(h, dim=-2)
     var = torch.relu(h_mean_squares - h_mean * h_mean)
     return var
 
 
-def aggregate_moment(h, n=3, **kwargs):
+def aggregate_moment(h, n=3):
+    """
+    Compute the nth moment of the input tensor along the second to last dimension.
+
+    Parameters
+    ----------
+    h : torch.Tensor
+        Input tensor.
+    n : int, optional, default=3
+        The order of the moment to compute.
+
+    Returns
+    -------
+    torch.Tensor
+        Nth moment of the input tensor along the second to last dimension.
+    """
     # for each node (E[(X-E[X])^n])^{1/n}
     # EPS is added to the absolute value of expectation before taking the nth root for stability
     h_mean = torch.mean(h, dim=-2, keepdim=True)
@@ -279,25 +459,85 @@ def aggregate_moment(h, n=3, **kwargs):
     return rooted_h_n
 
 
-def aggregate_sum(h, **kwargs):
+def aggregate_sum(h):
+    """
+    Compute the sum of the input tensor along the second to last dimension.
+
+    Parameters
+    ----------
+    h : torch.Tensor
+        Input tensor.
+
+    Returns
+    -------
+    torch.Tensor
+        Sum of the input tensor along the second to last dimension.
+    """
     return torch.sum(h, dim=-2)
 
 
 # each scaler is a function that takes as input X (B x N x Din), adj (B x N x N) and
 # avg_d (dictionary containing averages over training set) and returns X_scaled (B x N x Din) as output
-
-
 def scale_identity(h, D=None, avg_d=None):
+    """
+    Identity scaling function.
+
+    Parameters
+    ----------
+    h : torch.Tensor
+        Input tensor.
+    D : torch.Tensor, optional
+        Degree tensor.
+    avg_d : dict, optional
+        Dictionary containing averages over the training set.
+
+    Returns
+    -------
+    torch.Tensor
+        Scaled input tensor.
+    """
     return h
 
 
 def scale_amplification(h, D, avg_d):
-    # log(D + 1) / d * h     where d is the average of the ``log(D + 1)`` in the training set
+    """
+    Amplification scaling function. log(D + 1) / d * h where d is the average of the ``log(D + 1)`` in the training set
+
+    Parameters
+    ----------
+    h : torch.Tensor
+        Input tensor.
+    D : torch.Tensor
+        Degree tensor.
+    avg_d : dict
+        Dictionary containing averages over the training set.
+
+    Returns
+    -------
+    torch.Tensor
+        Scaled input tensor.
+    """
     return h * (np.log(D + 1) / avg_d["log"])
 
 
 def scale_attenuation(h, D, avg_d):
-    # (log(D + 1))^-1 / d * X     where d is the average of the ``log(D + 1))^-1`` in the training set
+    """
+    Attenuation scaling function. (log(D + 1))^-1 / d * X where d is the average of the ``log(D + 1))^-1`` in the training set
+
+    Parameters
+    ----------
+    h : torch.Tensor
+        Input tensor.
+    D : torch.Tensor
+        Degree tensor.
+    avg_d : dict
+        Dictionary containing averages over the training set.
+
+    Returns
+    -------
+    torch.Tensor
+        Scaled input tensor.
+    """
     return h * (avg_d["log"] / np.log(D + 1))
 
 
@@ -322,10 +562,63 @@ PNA_SCALERS = {
 
 class PNA(nn.Module):
     """
-    Message Passing Neural Network that does not use 3D information
+    Principal Neighbourhood Aggregation Message Passing Neural Network [1]. This is a 2D GNN.
 
-    PNA: Principal Neighbourhood Aggregation 
-        Gabriele Corso, Luca Cavalleri, Dominique Beaini, Pietro Lio, Petar Velickovic
+    Parameters
+    ----------
+    hidden_dim : int
+        Dimension of the hidden layers.
+    target_dim : int
+        Dimension of the output layer.
+    aggregators : List[str]
+        List of aggregator functions to use.
+    scalers : List[str]
+        List of scaler functions to use.
+    readout_aggregators : List[str]
+        List of readout aggregator functions to use.
+    readout_batchnorm : bool, optional, default=True
+        Whether to use batch normalization in the readout layers.
+    readout_hidden_dim : int, optional
+        Dimension of the hidden layers in the readout layers. If not provided, it will be set to the value of `hidden_dim`.
+    readout_layers : int, optional, default=2
+        Number of layers in the readout layers.
+    residual : bool, optional, default=True
+        Whether to use residual connections.
+    pairwise_distances : bool, optional, default=False
+        Whether to use pairwise distances.
+    activation : Union[Callable, str], optional, default="relu"
+        Activation function to use.
+    last_activation : Union[Callable, str], optional, default="none"
+        Last activation function to use.
+    mid_batch_norm : bool, optional, default=False
+        Whether to use batch normalization in the middle layers.
+    last_batch_norm : bool, optional, default=False
+        Whether to use batch normalization in the last layer.
+    propagation_depth : int, optional, default=5
+        Number of propagation layers.
+    dropout : float, optional, default=0.0
+        Dropout rate.
+    posttrans_layers : int, optional, default=1
+        Number of post-transformation layers.
+    pretrans_layers : int, optional, default=1
+        Number of pre-transformation layers.
+    batch_norm_momentum : float, optional, default=0.1
+        Momentum for the batch normalization layers.
+
+    Examples
+    --------
+    >>> import dgl
+    >>> import torch
+    >>> from deepchem.models.torch_models.infomax3d import PNA
+    >>> g = dgl.graph(([0, 1, 2], [1, 2, 0]))
+    >>> g.ndata['x'] = torch.randn(3, 3)
+    >>> g.edata['edge_attr'] = torch.randn(3, 3)
+    >>> model = PNA(hidden_dim=16, target_dim=1, aggregators=['mean', 'sum'], scalers=['identity'], readout_aggregators=['mean'])
+    >>> output = model(g)
+
+    References
+    ----------
+    .. [1] Gabriele Corso, Luca Cavalleri, Dominique Beaini, Pietro Lio, Petar Velickovic
         https://arxiv.org/abs/2004.05718
     """
 
@@ -387,6 +680,51 @@ class PNA(nn.Module):
 
 
 class PNAGNN(nn.Module):
+    """
+    Principal Neighbourhood Aggregation Graph Neural Network
+
+    Parameters
+    ----------
+    hidden_dim : int
+        Dimension of the hidden layers.
+    aggregators : List[str]
+        List of aggregator functions to use.
+    scalers : List[str]
+        List of scaler functions to use.
+    residual : bool, optional, default=True
+        Whether to use residual connections.
+    pairwise_distances : bool, optional, default=False
+        Whether to use pairwise distances.
+    activation : Union[Callable, str], optional, default="relu"
+        Activation function to use.
+    last_activation : Union[Callable, str], optional, default="none"
+        Last activation function to use.
+    mid_batch_norm : bool, optional, default=False
+        Whether to use batch normalization in the middle layers.
+    last_batch_norm : bool, optional, default=False
+        Whether to use batch normalization in the last layer.
+    batch_norm_momentum : float, optional, default=0.1
+        Momentum for the batch normalization layers.
+    propagation_depth : int, optional, default=5
+        Number of propagation layers.
+    dropout : float, optional, default=0.0
+        Dropout rate.
+    posttrans_layers : int, optional, default=1
+        Number of post-transformation layers.
+    pretrans_layers : int, optional, default=1
+        Number of pre-transformation layers.
+
+    Examples
+    --------
+    >>> import dgl
+    >>> import torch
+    >>> from deepchem.models.torch_models.infomax3d import PNAGNN
+    >>> g = dgl.graph(([0, 1, 2], [1, 2, 0]))
+    >>> g.ndata['x'] = torch.randn(3, 3)
+    >>> g.edata['edge_attr'] = torch.randn(3, 3)
+    >>> model = PNAGNN(hidden_dim=16, aggregators=['mean', 'sum'], scalers=['identity'])
+    >>> model(g)
+    """
 
     def __init__(self,
                  hidden_dim,
@@ -438,7 +776,44 @@ class PNAGNN(nn.Module):
 
 
 class PNALayer(nn.Module):
+    """
+    Principal Neighbourhood Aggregation Layer.
 
+    Parameters
+    ----------
+    in_dim : int
+        Input dimension of the node features.
+    out_dim : int
+        Output dimension of the node features.
+    in_dim_edges : int
+        Input dimension of the edge features.
+    aggregators : List[str]
+        List of aggregator functions to use.
+    scalers : List[str]
+        List of scaler functions to use.
+    activation : Union[Callable, str], optional, default="relu"
+        Activation function to use.
+    last_activation : Union[Callable, str], optional, default="none"
+        Last activation function to use.
+    dropout : float, optional, default=0.0
+        Dropout rate.
+    residual : bool, optional, default=True
+        Whether to use residual connections.
+    pairwise_distances : bool, optional, default=False
+        Whether to use pairwise distances.
+    mid_batch_norm : bool, optional, default=False
+        Whether to use batch normalization in the middle layers.
+    last_batch_norm : bool, optional, default=False
+        Whether to use batch normalization in the last layer.
+    batch_norm_momentum : float, optional, default=0.1
+        Momentum for the batch normalization layers.
+    avg_d : Dict[str, float], optional, default={"log": 1.0}
+        Dictionary containing the average degree of the graph.
+    posttrans_layers : int, optional, default=2
+        Number of post-transformation layers.
+    pretrans_layers : int, optional, default=1
+        Number of pre-transformation layers.
+    """
     def __init__(
         self,
         in_dim: int,
@@ -488,6 +863,14 @@ class PNALayer(nn.Module):
             dropout=dropout)
 
     def forward(self, g):
+        """
+        Forward pass of the PNA layer.
+
+        Parameters
+        ----------
+        g : dgl.DGLGraph
+            Input graph.
+        """
         h = g.ndata['feat']
         h_in = h
         # pretransformation
@@ -504,15 +887,35 @@ class PNALayer(nn.Module):
         g.ndata['feat'] = h
 
     def message_func(self, edges) -> Dict[str, torch.Tensor]:
-        r"""
+        """
         The message function to generate messages along the edges.
+
+        Parameters
+        ----------
+        edges : dgl.EdgeBatch
+            Batch of edges.
+
+        Returns
+        -------
+        Dict[str, torch.Tensor]
+            Dictionary containing the edge features.
         """
         return {"e": edges.data["e"]}
 
     def reduce_func(self, nodes) -> Dict[str, torch.Tensor]:
-        r"""
+        """
         The reduce function to aggregate the messages.
         Apply the aggregators and scalers, and concatenate the results.
+
+        Parameters
+        ----------
+        nodes : dgl.NodeBatch
+            Batch of nodes.
+
+        Returns
+        -------
+        Dict[str, torch.Tensor]
+            Dictionary containing the aggregated node features.
         """
         h_in = nodes.data['feat']
         h = nodes.mailbox["e"]
@@ -528,10 +931,21 @@ class PNALayer(nn.Module):
         return {'feat': h}
 
     def pretrans_edges(self, edges) -> Dict[str, torch.Tensor]:
-        r"""
+        """
         Return a mapping to the concatenation of the features from
         the source node, the destination node, and the edge between them (if applicable).
+
+        Parameters
+        ----------
+        edges : dgl.EdgeBatch
+            Batch of edges.
+
+        Returns
+        -------
+        Dict[str, torch.Tensor]
+            Dictionary containing the concatenated features.
         """
+
         if self.edge_features and self.pairwise_distances:
             squared_distance = torch.sum((edges.src['x'] - edges.dst['x'])**2,
                                          dim=-1)[:, None]
@@ -556,6 +970,34 @@ class PNALayer(nn.Module):
 
 
 def fourier_encode_dist(x, num_encodings=4, include_self=True):
+    """
+    Fourier encode the input tensor `x` based on the specified number of encodings.
+
+    This function applies a Fourier encoding to the input tensor `x` by dividing
+    it by a range of scales (2^i for i in range(num_encodings)) and then
+    concatenating the sine and cosine of the scaled values. Optionally, the
+    original input tensor can be included in the output.
+
+    Parameters
+    ----------
+    x : torch.Tensor
+        Input tensor to be Fourier encoded.
+    num_encodings : int, optional, default=4
+        Number of Fourier encodings to apply.
+    include_self : bool, optional, default=True
+        Whether to include the original input tensor in the output.
+
+    Returns
+    -------
+    torch.Tensor
+        Fourier encoded tensor.
+
+    Examples
+    --------
+    >>> import torch
+    >>> x = torch.tensor([1.0, 2.0, 3.0])
+    >>> encoded_x = fourier_encode_dist(x, num_encodings=4, include_self=True)
+    """
     x = x.unsqueeze(-1)
     device, dtype, orig_x = x.device, x.dtype, x
     scales = 2**torch.arange(num_encodings, device=device, dtype=dtype)
