@@ -345,7 +345,7 @@ class Net3DLayer(nn.Module):
 EPS = 1e-5
 
 
-def aggregate_mean(h):
+def aggregate_mean(h, **kwargs):
     """
     Compute the mean of the input tensor along the second to last dimension.
 
@@ -362,7 +362,7 @@ def aggregate_mean(h):
     return torch.mean(h, dim=-2)
 
 
-def aggregate_max(h):
+def aggregate_max(h, **kwargs):
     """
     Compute the max of the input tensor along the second to last dimension.
 
@@ -379,7 +379,7 @@ def aggregate_max(h):
     return torch.max(h, dim=-2)[0]
 
 
-def aggregate_min(h):
+def aggregate_min(h, **kwargs):
     """
     Compute the min of the input tensor along the second to last dimension.
 
@@ -398,7 +398,7 @@ def aggregate_min(h):
     return torch.min(h, dim=-2)[0]
 
 
-def aggregate_std(h):
+def aggregate_std(h, **kwargs):
     """
     Compute the standard deviation of the input tensor along the second to last dimension.
 
@@ -415,7 +415,7 @@ def aggregate_std(h):
     return torch.sqrt(aggregate_var(h) + EPS)
 
 
-def aggregate_var(h):
+def aggregate_var(h, **kwargs):
     """
     Compute the variance of the input tensor along the second to last dimension.
 
@@ -435,7 +435,7 @@ def aggregate_var(h):
     return var
 
 
-def aggregate_moment(h, n=3):
+def aggregate_moment(h, n=3, **kwargs):
     """
     Compute the nth moment of the input tensor along the second to last dimension.
 
@@ -459,7 +459,7 @@ def aggregate_moment(h, n=3):
     return rooted_h_n
 
 
-def aggregate_sum(h):
+def aggregate_sum(h, **kwargs):
     """
     Compute the sum of the input tensor along the second to last dimension.
 

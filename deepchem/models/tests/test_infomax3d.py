@@ -21,9 +21,7 @@ model2d = PNA(in_dim=75,
               aggregators=['sum', 'mean', 'max'],
               scalers=["identity"],
               readout_aggregators=["sum"])
-model3d = Net3D(node_dim=75,
-                edge_dim=12,
-                hidden_dim=64,
+model3d = Net3D(hidden_dim=64,
                 target_dim=5,
                 readout_aggregators=["sum"])
 
